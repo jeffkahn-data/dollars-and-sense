@@ -1240,18 +1240,18 @@ HTML_TEMPLATE = '''
                 
                 <div id="trends-charts" style="display: none;">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                        <div class="metric-summary-card" style="background: var(--bg-card); padding: 1rem; border-radius: 10px; border: 1px solid var(--border-color);">
-                            <h3 style="color: var(--accent-green); margin-bottom: 0.75rem; font-size: 0.9rem;">📊 NDCG Over Time</h3>
-                            <canvas id="ndcg-chart" height="200"></canvas>
+                        <div class="metric-summary-card" style="background: var(--bg-card); padding: 0.75rem; border-radius: 10px; border: 1px solid var(--border-color);">
+                            <h3 style="color: var(--accent-green); margin-bottom: 0.5rem; font-size: 0.85rem;">📊 NDCG Over Time</h3>
+                            <div style="height: 150px;"><canvas id="ndcg-chart"></canvas></div>
                         </div>
-                        <div class="metric-summary-card" style="background: var(--bg-card); padding: 1rem; border-radius: 10px; border: 1px solid var(--border-color);">
-                            <h3 style="color: var(--accent-blue); margin-bottom: 0.75rem; font-size: 0.9rem;">📍 CTR & PTR Over Time</h3>
-                            <canvas id="ctr-chart" height="200"></canvas>
+                        <div class="metric-summary-card" style="background: var(--bg-card); padding: 0.75rem; border-radius: 10px; border: 1px solid var(--border-color);">
+                            <h3 style="color: var(--accent-blue); margin-bottom: 0.5rem; font-size: 0.85rem;">📍 CTR & PTR Over Time</h3>
+                            <div style="height: 150px;"><canvas id="ctr-chart"></canvas></div>
                         </div>
                     </div>
-                    <div class="metric-summary-card" style="background: var(--bg-card); padding: 1rem; border-radius: 10px; border: 1px solid var(--border-color);">
-                        <h3 style="color: var(--accent-purple); margin-bottom: 0.75rem; font-size: 0.9rem;">📦 Sessions & Impressions</h3>
-                        <canvas id="volume-chart" height="150"></canvas>
+                    <div class="metric-summary-card" style="background: var(--bg-card); padding: 0.75rem; border-radius: 10px; border: 1px solid var(--border-color);">
+                        <h3 style="color: var(--accent-purple); margin-bottom: 0.5rem; font-size: 0.85rem;">📦 Sessions & Impressions</h3>
+                        <div style="height: 120px;"><canvas id="volume-chart"></canvas></div>
                     </div>
                 </div>
                 
