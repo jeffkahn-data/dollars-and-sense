@@ -1154,6 +1154,7 @@ HTML_TEMPLATE = '''
                         <button class="dimension-btn active" onclick="loadGmvOpportunity('surface')">By Surface</button>
                         <button class="dimension-btn" onclick="loadGmvOpportunity('segment')">By Segment</button>
                         <button class="dimension-btn" onclick="loadGmvOpportunity('category')">By Category</button>
+                        <button class="dimension-btn" onclick="loadGmvOpportunity('country')">By Country</button>
                     </div>
                     <div class="filter-group">
                         <label>Days Back</label>
@@ -2509,11 +2510,13 @@ def api_gmv_opportunity():
     dim_column_map = {
         'surface': 'imp.surface',
         'segment': 'CASE WHEN imp.user_id > 0 THEN "Returning" ELSE "Anonymous" END',
-        'category': 'COALESCE(p.category, "Uncategorized")'
+        'category': 'COALESCE(p.category, "Uncategorized")',
+        'country': 'COALESCE(ud.last.geo.country, "Unknown")'
     }
     
     dim_column = dim_column_map.get(dimension, 'imp.surface')
     needs_product_join = dimension == 'category'
+    needs_user_join = dimension == 'country'
     
     query = f"""
     WITH impressions AS (
@@ -2534,6 +2537,7 @@ def api_gmv_opportunity():
       LEFT JOIN UNNEST(imp.any_touch_attr_orders) AS orders
         ON orders.is_attributable_to_product_click = TRUE
       {"LEFT JOIN `sdp-prd-merchandising.products_and_pricing_intermediate.products_extended` p ON CAST(imp.entity_id AS INT64) = p.product_id" if needs_product_join else ""}
+      {"LEFT JOIN `sdp-prd-shop-ml.mart.mart__shop_app__deduped_user_dimension` ud ON imp.user_id = ud.deduped_user_id" if needs_user_join else ""}
       WHERE DATE(imp.event_timestamp) >= DATE_SUB(CURRENT_DATE(), INTERVAL {days_back} DAY)
         AND imp.section_y_pos > 0
         AND imp.section_y_pos <= 20
