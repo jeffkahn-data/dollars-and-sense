@@ -66,6 +66,7 @@ def query_sessions(
     category: Optional[str] = None,
     segment: Optional[str] = None,
     surface: Optional[str] = None,
+    country: Optional[str] = None,
     days_back: int = 7,
     limit: int = 10,
     min_items: int = 4,
@@ -87,18 +88,29 @@ def query_sessions(
     if surface and surface != 'all':
         where_clauses.append(f"imp.surface = '{surface}'")
     
+    # Build country join clause if needed
+    country_join = ""
+    country_filter = ""
+    if country and country != 'all':
+        country_join = """
+      INNER JOIN `sdp-prd-shop-ml.mart.mart__shop_app__deduped_user_dimension` ud
+        ON imp.user_id = ud.deduped_user_id"""
+        country_filter = f" AND ud.last.geo.country = '{country}'"
+    
     # Build the query
     query = f"""
     WITH purchase_sessions AS (
       -- Find sessions with purchases (for interesting examples)
-      SELECT DISTINCT session_id
-      FROM `sdp-prd-shop-ml.product_recommendation.intermediate__shop_personalization__recs_impressions_enriched`
-      WHERE DATE(event_timestamp) >= DATE_SUB(CURRENT_DATE(), INTERVAL {days_back} DAY)
-        AND section_y_pos > 0
-        AND section_y_pos <= 10
-        AND entity_type = 'product'
-        AND entity_is_unified_rec
-        {"AND has_1d_any_touch_attr_order = true" if require_purchase else "AND (is_clicked OR has_1d_any_touch_attr_order)"}
+      SELECT DISTINCT imp.session_id
+      FROM `sdp-prd-shop-ml.product_recommendation.intermediate__shop_personalization__recs_impressions_enriched` imp
+      {country_join}
+      WHERE DATE(imp.event_timestamp) >= DATE_SUB(CURRENT_DATE(), INTERVAL {days_back} DAY)
+        AND imp.section_y_pos > 0
+        AND imp.section_y_pos <= 10
+        AND imp.entity_type = 'product'
+        AND imp.entity_is_unified_rec
+        {"AND imp.has_1d_any_touch_attr_order = true" if require_purchase else "AND (imp.is_clicked OR imp.has_1d_any_touch_attr_order)"}
+        {country_filter}
       LIMIT 100
     ),
     
@@ -229,9 +241,10 @@ def query_sessions(
 
 
 def get_filter_options():
-    """Get available filter options from recent data."""
+    """Get available filter options from recent data including buyer countries."""
     client = get_bq_client()
     
+    # Query for surfaces and categories
     query = """
     SELECT DISTINCT
       surface,
@@ -245,21 +258,40 @@ def get_filter_options():
     LIMIT 1000
     """
     
+    # Query for top buyer countries
+    country_query = """
+    SELECT 
+      last.geo.country AS buyer_country,
+      COUNT(DISTINCT deduped_user_id) AS user_count
+    FROM `sdp-prd-shop-ml.mart.mart__shop_app__deduped_user_dimension`
+    WHERE last.geo.country IS NOT NULL
+    GROUP BY buyer_country
+    ORDER BY user_count DESC
+    LIMIT 20
+    """
+    
     try:
         results = client.query(query).to_dataframe()
         surfaces = sorted(results['surface'].dropna().unique().tolist())
         categories = sorted([c for c in results['category'].dropna().unique().tolist() if c != 'Uncategorized'])[:20]
+        
+        # Get countries
+        country_results = client.query(country_query).to_dataframe()
+        countries = country_results['buyer_country'].dropna().tolist()
+        
         return {
             'surfaces': surfaces,
             'categories': categories,
-            'segments': ['returning', 'anonymous']
+            'segments': ['returning', 'anonymous'],
+            'countries': countries
         }
     except Exception as e:
         print(f"Error getting filter options: {e}")
         return {
             'surfaces': ['super_feed', 'pdp', 'search'],
             'categories': ['Beauty', 'Electronics', 'Apparel & Accessories', 'Home & Kitchen'],
-            'segments': ['returning', 'anonymous']
+            'segments': ['returning', 'anonymous'],
+            'countries': ['US', 'CA', 'GB', 'AU', 'DE', 'FR', 'JP', 'MX', 'BR', 'IN']
         }
 
 
@@ -981,6 +1013,12 @@ HTML_TEMPLATE = '''
                 </select>
             </div>
             <div class="filter-group">
+                <label>Country</label>
+                <select id="filter-country">
+                    <option value="all">All Countries</option>
+                </select>
+            </div>
+            <div class="filter-group">
                 <label>Days Back</label>
                 <input type="number" id="days-back" value="7" min="1" max="30" style="width: 80px;">
             </div>
@@ -1203,6 +1241,16 @@ HTML_TEMPLATE = '''
                     opt.textContent = surf;
                     surfaceSelect.appendChild(opt);
                 });
+                
+                const countrySelect = document.getElementById('filter-country');
+                if (data.countries) {
+                    data.countries.forEach(country => {
+                        const opt = document.createElement('option');
+                        opt.value = country;
+                        opt.textContent = country;
+                        countrySelect.appendChild(opt);
+                    });
+                }
             } catch (e) {
                 console.error('Failed to load filters:', e);
             }
@@ -1343,6 +1391,7 @@ HTML_TEMPLATE = '''
                 category: document.getElementById('filter-category').value,
                 segment: document.getElementById('filter-segment').value,
                 surface: document.getElementById('filter-surface').value,
+                country: document.getElementById('filter-country').value,
                 days_back: document.getElementById('days-back').value,
                 limit: document.getElementById('max-results').value
             });
@@ -1375,6 +1424,7 @@ HTML_TEMPLATE = '''
             document.getElementById('filter-category').value = 'all';
             document.getElementById('filter-segment').value = 'all';
             document.getElementById('filter-surface').value = 'all';
+            document.getElementById('filter-country').value = 'all';
             document.getElementById('days-back').value = '7';
             document.getElementById('max-results').value = '10';
         }
@@ -1396,6 +1446,7 @@ HTML_TEMPLATE = '''
                 category: document.getElementById('filter-category').value,
                 segment: document.getElementById('filter-segment').value,
                 surface: document.getElementById('filter-surface').value,
+                country: document.getElementById('filter-country').value,
                 days_back: document.getElementById('days-back').value
             });
             
@@ -1851,37 +1902,47 @@ def api_metrics():
     category = request.args.get('category', 'all')
     segment = request.args.get('segment', 'all')
     surface = request.args.get('surface', 'all')
+    country = request.args.get('country', 'all')
     days_back = int(request.args.get('days_back', 7))
     
     client = get_bq_client()
     
     # Build WHERE clauses
     where_clauses = [
-        f"DATE(event_timestamp) >= DATE_SUB(CURRENT_DATE(), INTERVAL {days_back} DAY)",
-        "section_y_pos > 0",
-        "section_y_pos <= 20",
-        "entity_type = 'product'",
-        "entity_is_unified_rec",
+        f"DATE(imp.event_timestamp) >= DATE_SUB(CURRENT_DATE(), INTERVAL {days_back} DAY)",
+        "imp.section_y_pos > 0",
+        "imp.section_y_pos <= 20",
+        "imp.entity_type = 'product'",
+        "imp.entity_is_unified_rec",
     ]
     
     if surface and surface != 'all':
-        where_clauses.append(f"surface = '{surface}'")
+        where_clauses.append(f"imp.surface = '{surface}'")
+    
+    # Country join if needed
+    country_join = ""
+    if country and country != 'all':
+        country_join = """
+      INNER JOIN `sdp-prd-shop-ml.mart.mart__shop_app__deduped_user_dimension` ud
+        ON imp.user_id = ud.deduped_user_id"""
+        where_clauses.append(f"ud.last.geo.country = '{country}'")
     
     where_sql = ' AND '.join(where_clauses)
     
     query = f"""
     WITH impressions AS (
       SELECT
-        session_id,
-        section_y_pos AS position,
-        is_clicked,
-        has_1d_any_touch_attr_order AS has_purchase,
+        imp.session_id,
+        imp.section_y_pos AS position,
+        imp.is_clicked,
+        imp.has_1d_any_touch_attr_order AS has_purchase,
         CASE 
-          WHEN has_1d_any_touch_attr_order THEN 4
-          WHEN is_clicked THEN 2
+          WHEN imp.has_1d_any_touch_attr_order THEN 4
+          WHEN imp.is_clicked THEN 2
           ELSE 0
         END AS relevance
-      FROM `sdp-prd-shop-ml.product_recommendation.intermediate__shop_personalization__recs_impressions_enriched`
+      FROM `sdp-prd-shop-ml.product_recommendation.intermediate__shop_personalization__recs_impressions_enriched` imp
+      {country_join}
       WHERE {where_sql}
     ),
     
@@ -2379,6 +2440,7 @@ def api_sessions():
     category = request.args.get('category', 'all')
     segment = request.args.get('segment', 'all')
     surface = request.args.get('surface', 'all')
+    country = request.args.get('country', 'all')
     days_back = int(request.args.get('days_back', 7))
     limit = int(request.args.get('limit', 10))
     
@@ -2386,6 +2448,7 @@ def api_sessions():
         category=category if category != 'all' else None,
         segment=segment if segment != 'all' else None,
         surface=surface if surface != 'all' else None,
+        country=country if country != 'all' else None,
         days_back=min(days_back, 30),
         limit=min(limit, 50)
     )
