@@ -107,22 +107,53 @@ See `docs/metrics_glossary.md` for detailed NDCG formulas and interpretation.
 
 ## 🚀 Getting Started
 
-1. **Clone the repo**:
-   ```bash
-   cd ~/Code
-   git clone <repo-url> dollars-and-sense
-   ```
+### Quick Setup with `dev`
 
-2. **Set up BigQuery access**:
-   - Request access to `sdp-prd-shop-ml` via helpdesk
-   - Follow [Data Platform Access Permissions](https://vault.shopify.io/page/Data-Platform-Access-Permissions~rfTW.md)
+```bash
+# Clone and setup with Shopify's dev tool
+dev clone jeffkahn-data/dollars-and-sense
+cd dollars-and-sense
+dev up
+```
 
-3. **Explore the dashboard**:
-   - [Unified Recommendations Dashboard](https://lookerstudio.google.com/u/0/reporting/7d5e18c5-2e09-479d-870a-b64f7ad0ff4e/page/p_wmdft5ogvd)
+This will automatically:
+- Install Python 3.11
+- Create a virtual environment
+- Install all dependencies from `tools/requirements.txt`
 
-4. **Run queries**:
-   - Start with queries in `queries/exploration/` to understand the data
-   - Use `queries/metrics/` for standardized metric calculations
+### Run the NDCG Visualizer
+
+```bash
+# Start the Flask server
+dev server
+# Or manually:
+python tools/ndcg_server.py --port 8080
+```
+
+Then open http://localhost:8080 to access:
+- **🔍 Explorer**: Search and visualize individual recommendation sessions
+- **📊 Optimization**: Identify underperforming surfaces, segments, or categories  
+- **💰 GMV Opportunity**: Calculate dollar impact of NDCG improvements
+
+### Manual Setup (without `dev`)
+
+```bash
+git clone https://github.com/jeffkahn-data/dollars-and-sense.git
+cd dollars-and-sense
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r tools/requirements.txt
+python tools/ndcg_server.py --port 8080
+```
+
+### BigQuery Access
+
+- Request access to `sdp-prd-shop-ml` via helpdesk
+- Follow [Data Platform Access Permissions](https://vault.shopify.io/page/Data-Platform-Access-Permissions~rfTW.md)
+
+### Explore the Dashboard
+
+- [Unified Recommendations Dashboard](https://lookerstudio.google.com/u/0/reporting/7d5e18c5-2e09-479d-870a-b64f7ad0ff4e/page/p_wmdft5ogvd)
 
 ## 📚 Resources
 
