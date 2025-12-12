@@ -1170,17 +1170,28 @@ HTML_TEMPLATE = '''
                             <div class="value" style="color: var(--accent-green);"><span id="gmv-total">--</span><span class="type">7 Days</span></div>
                         </div>
                     </div>
-                    <div class="benchmark" style="background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(251, 191, 36, 0.05)); border-color: var(--accent-orange);">
-                        <div class="label">Est. GMV Opportunity</div>
-                        <div class="values">
-                            <div class="value" style="color: var(--accent-orange);"><span id="gmv-opportunity">--</span><span class="type">If NDCG → Median</span></div>
-                        </div>
-                    </div>
                     <div class="benchmark">
-                        <div class="label">NDCG</div>
+                        <div class="label">Current NDCG</div>
                         <div class="values">
                             <div class="value"><span id="gmv-ndcg-avg">--</span><span class="type">Mean</span></div>
-                            <div class="value"><span id="gmv-ndcg-median">--</span><span class="type">Median</span></div>
+                        </div>
+                    </div>
+                    <div class="benchmark" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.05)); border-color: var(--accent-blue);">
+                        <div class="label">GMV if → 0.6</div>
+                        <div class="values">
+                            <div class="value" style="color: var(--accent-blue);"><span id="gmv-opp-06">--</span></div>
+                        </div>
+                    </div>
+                    <div class="benchmark" style="background: linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(168, 85, 247, 0.05)); border-color: var(--accent-purple);">
+                        <div class="label">GMV if → 0.7</div>
+                        <div class="values">
+                            <div class="value" style="color: var(--accent-purple);"><span id="gmv-opp-07">--</span></div>
+                        </div>
+                    </div>
+                    <div class="benchmark" style="background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.05)); border-color: var(--accent-green);">
+                        <div class="label">GMV if → 0.8</div>
+                        <div class="values">
+                            <div class="value" style="color: var(--accent-green);"><span id="gmv-opp-08">--</span></div>
                         </div>
                     </div>
                 </div>
@@ -1200,13 +1211,13 @@ HTML_TEMPLATE = '''
                     <thead>
                         <tr>
                             <th>Dimension</th>
-                            <th>Attributed GMV</th>
+                            <th>GMV</th>
                             <th>Sessions</th>
                             <th>NDCG</th>
-                            <th>Gap to Median</th>
-                            <th style="color: var(--accent-orange);">💰 GMV Opportunity</th>
+                            <th style="color: var(--accent-blue);">→ 0.6</th>
+                            <th style="color: var(--accent-purple);">→ 0.7</th>
+                            <th style="color: var(--accent-green);">→ 0.8</th>
                             <th>CTR</th>
-                            <th>PTR</th>
                         </tr>
                     </thead>
                     <tbody id="gmv-tbody">
@@ -1881,28 +1892,29 @@ HTML_TEMPLATE = '''
                 
                 // Update summary cards
                 document.getElementById('gmv-total').textContent = formatCurrency(data.overall.total_gmv || 0);
-                document.getElementById('gmv-opportunity').textContent = formatCurrency(data.total_opportunity || 0);
                 document.getElementById('gmv-ndcg-avg').textContent = (data.overall.avg_ndcg || 0).toFixed(3);
-                document.getElementById('gmv-ndcg-median').textContent = (data.overall.median_ndcg || 0).toFixed(3);
+                document.getElementById('gmv-opp-06').textContent = '+' + formatCurrency(data.total_opp_06 || 0);
+                document.getElementById('gmv-opp-07').textContent = '+' + formatCurrency(data.total_opp_07 || 0);
+                document.getElementById('gmv-opp-08').textContent = '+' + formatCurrency(data.total_opp_08 || 0);
                 
-                // Show top 3 opportunities as cards
-                const topItems = data.items.filter(i => i.gmv_opportunity > 0).slice(0, 3);
+                // Show top 3 opportunities as cards (based on 0.7 target)
+                const topItems = data.items.filter(i => i.gmv_opp_07 > 0).sort((a, b) => b.gmv_opp_07 - a.gmv_opp_07).slice(0, 3);
                 if (topItems.length > 0) {
                     topOpps.innerHTML = `
-                        <h3 style="font-size: 0.9rem; color: var(--accent-orange); margin-bottom: 0.75rem;">
-                            🔥 Top GMV Opportunities
+                        <h3 style="font-size: 0.9rem; color: var(--accent-purple); margin-bottom: 0.75rem;">
+                            🔥 Top GMV Opportunities (to reach 0.7 NDCG)
                         </h3>
                         ${topItems.map((item, idx) => `
-                            <div class="opportunity-card" style="border-color: var(--accent-orange); background: rgba(251, 191, 36, 0.1);">
-                                <h4 style="color: var(--accent-orange);">#${idx + 1}: ${item.dimension_value}</h4>
+                            <div class="opportunity-card" style="border-color: var(--accent-purple); background: rgba(168, 85, 247, 0.1);">
+                                <h4 style="color: var(--accent-purple);">#${idx + 1}: ${item.dimension_value}</h4>
                                 <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0.5rem 0;">
-                                    NDCG ${item.avg_ndcg.toFixed(3)} is ${item.ndcg_gap_pct.toFixed(1)}% below median. 
-                                    Improving ranking could unlock <strong style="color: var(--accent-orange);">${formatCurrency(item.gmv_opportunity)}</strong> in GMV.
+                                    Current NDCG: ${item.avg_ndcg.toFixed(3)}. 
+                                    Reaching 0.7 could unlock <strong style="color: var(--accent-purple);">${formatCurrency(item.gmv_opp_07)}</strong> in GMV.
                                 </p>
                                 <div class="opportunity-stats">
-                                    <span style="background: rgba(251, 191, 36, 0.2); color: var(--accent-orange);">${formatCurrency(item.gmv_usd)} Current GMV</span>
-                                    <span style="background: rgba(251, 191, 36, 0.2); color: var(--accent-orange);">${formatCurrency(item.gmv_opportunity)} Opportunity</span>
-                                    <span>${(item.sessions / 1000000).toFixed(1)}M Sessions</span>
+                                    <span style="background: rgba(59, 130, 246, 0.2); color: var(--accent-blue);">→0.6: ${formatCurrency(item.gmv_opp_06)}</span>
+                                    <span style="background: rgba(168, 85, 247, 0.2); color: var(--accent-purple);">→0.7: ${formatCurrency(item.gmv_opp_07)}</span>
+                                    <span style="background: rgba(34, 197, 94, 0.2); color: var(--accent-green);">→0.8: ${formatCurrency(item.gmv_opp_08)}</span>
                                 </div>
                             </div>
                         `).join('')}
@@ -1912,26 +1924,28 @@ HTML_TEMPLATE = '''
                 
                 // Populate table
                 data.items.forEach(item => {
-                    const hasOpportunity = item.gmv_opportunity > 0;
+                    const hasOpp06 = item.gmv_opp_06 > 0;
+                    const hasOpp07 = item.gmv_opp_07 > 0;
+                    const hasOpp08 = item.gmv_opp_08 > 0;
                     tbody.innerHTML += `
                         <tr>
                             <td class="dimension-name">
                                 ${item.dimension_value}
-                                ${hasOpportunity ? '<span class="underperformer-badge" style="background: rgba(251, 191, 36, 0.2); color: var(--accent-orange);">OPPORTUNITY</span>' : ''}
+                                ${hasOpp07 ? '<span class="underperformer-badge" style="background: rgba(168, 85, 247, 0.2); color: var(--accent-purple);">OPPORTUNITY</span>' : ''}
                             </td>
                             <td class="metric-value" style="color: var(--accent-green);">${formatCurrency(item.gmv_usd)}</td>
                             <td class="metric-value">${(item.sessions / 1000000).toFixed(2)}M</td>
-                            <td class="metric-value ${item.avg_ndcg < data.overall.median_ndcg ? 'bad' : 'good'}">${item.avg_ndcg.toFixed(3)}</td>
-                            <td class="metric-value">
-                                ${item.ndcg_gap_pct > 0 
-                                    ? `<span class="delta negative">-${item.ndcg_gap_pct.toFixed(1)}%</span>` 
-                                    : '<span class="delta positive">≥ Median</span>'}
+                            <td class="metric-value">${item.avg_ndcg.toFixed(3)}</td>
+                            <td class="metric-value" style="${hasOpp06 ? 'color: var(--accent-blue); font-weight: 600;' : 'color: var(--text-secondary);'}">
+                                ${hasOpp06 ? '+' + formatCurrency(item.gmv_opp_06) : '--'}
                             </td>
-                            <td class="metric-value" style="${hasOpportunity ? 'color: var(--accent-orange); font-weight: 700;' : ''}">
-                                ${hasOpportunity ? formatCurrency(item.gmv_opportunity) : '--'}
+                            <td class="metric-value" style="${hasOpp07 ? 'color: var(--accent-purple); font-weight: 600;' : 'color: var(--text-secondary);'}">
+                                ${hasOpp07 ? '+' + formatCurrency(item.gmv_opp_07) : '--'}
+                            </td>
+                            <td class="metric-value" style="${hasOpp08 ? 'color: var(--accent-green); font-weight: 600;' : 'color: var(--text-secondary);'}">
+                                ${hasOpp08 ? '+' + formatCurrency(item.gmv_opp_08) : '--'}
                             </td>
                             <td class="metric-value">${item.ctr.toFixed(2)}%</td>
-                            <td class="metric-value">${item.ptr.toFixed(3)}%</td>
                         </tr>
                     `;
                 });
@@ -2608,8 +2622,21 @@ def api_gmv_opportunity():
         # GMV uplift factor: 15% GMV increase per 10% NDCG improvement (conservative)
         UPLIFT_FACTOR = 1.5  # 15% / 10% = 1.5
         
+        # NDCG targets for opportunity calculation
+        NDCG_TARGETS = [0.6, 0.7, 0.8]
+        
+        def calc_gmv_opportunity(current_ndcg, current_gmv, target_ndcg):
+            """Calculate GMV opportunity if NDCG improves to target."""
+            if current_ndcg <= 0 or current_ndcg >= target_ndcg:
+                return 0
+            ndcg_improvement_pct = ((target_ndcg - current_ndcg) / current_ndcg) * 100
+            return current_gmv * (ndcg_improvement_pct / 100) * UPLIFT_FACTOR
+        
         items = []
         total_opportunity = 0
+        total_opp_06 = 0
+        total_opp_07 = 0
+        total_opp_08 = 0
         
         for _, row in result.iterrows():
             current_ndcg = safe_float(row['avg_ndcg'])
@@ -2625,7 +2652,15 @@ def api_gmv_opportunity():
                 ndcg_gap_pct = 0
                 potential_gmv_increase = 0
             
+            # Calculate opportunity at specific NDCG targets
+            opp_06 = calc_gmv_opportunity(current_ndcg, current_gmv, 0.6)
+            opp_07 = calc_gmv_opportunity(current_ndcg, current_gmv, 0.7)
+            opp_08 = calc_gmv_opportunity(current_ndcg, current_gmv, 0.8)
+            
             total_opportunity += potential_gmv_increase
+            total_opp_06 += opp_06
+            total_opp_07 += opp_07
+            total_opp_08 += opp_08
             
             items.append({
                 'dimension_value': str(row['dimension_value']) if row['dimension_value'] else 'Unknown',
@@ -2640,6 +2675,9 @@ def api_gmv_opportunity():
                 'ndcg_gap': ndcg_gap,
                 'ndcg_gap_pct': ndcg_gap_pct,
                 'gmv_opportunity': potential_gmv_increase,
+                'gmv_opp_06': opp_06,
+                'gmv_opp_07': opp_07,
+                'gmv_opp_08': opp_08,
             })
         
         # Sort by GMV opportunity (highest first)
@@ -2655,6 +2693,9 @@ def api_gmv_opportunity():
             },
             'items': items,
             'total_opportunity': total_opportunity,
+            'total_opp_06': total_opp_06,
+            'total_opp_07': total_opp_07,
+            'total_opp_08': total_opp_08,
             'count': len(items),
             'uplift_model': f'{int(UPLIFT_FACTOR * 10)}% GMV increase per 10% NDCG improvement'
         })
