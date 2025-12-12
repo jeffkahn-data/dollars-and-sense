@@ -7,5 +7,7 @@ up:
 
 commands:
   server: python tools/ndcg_server.py --port 8080
-  test: echo "No tests configured yet"
+  test: python -m pytest tests/ -v --tb=short
+  test-cov: python -m pytest tests/ -v --cov=tools --cov-report=term-missing
+  lint: python -m py_compile tools/*.py
 

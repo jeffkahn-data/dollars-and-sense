@@ -33,6 +33,27 @@ CACHE_DIR = Path("tools/output/images")
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def safe_float(val, default=None):
+    """Convert to float safely, handling NaN, Inf, and None.
+    
+    Args:
+        val: Value to convert to float
+        default: Default value if conversion fails or result is NaN/Inf
+        
+    Returns:
+        Float value or default if invalid
+    """
+    if val is None:
+        return default
+    try:
+        f = float(val)
+        if math.isnan(f) or math.isinf(f):
+            return default
+        return f
+    except (TypeError, ValueError):
+        return default
+
+
 def get_bq_client():
     """Get or create BigQuery client."""
     global bq_client
