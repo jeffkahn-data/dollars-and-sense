@@ -1177,27 +1177,30 @@ HTML_TEMPLATE = '''
                         </div>
                     </div>
                     <div class="benchmark" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.05)); border-color: var(--accent-blue);">
-                        <div class="label">GMV if → 0.6</div>
+                        <div class="label">→ 0.6 NDCG</div>
                         <div class="values">
-                            <div class="value" style="color: var(--accent-blue);"><span id="gmv-opp-06">--</span></div>
+                            <div class="value" style="color: var(--accent-blue);"><span id="gmv-opp-06">--</span><span class="type">Period</span></div>
+                            <div class="value" style="color: var(--accent-blue); font-size: 1.1rem;"><span id="gmv-opp-06-annual">--</span><span class="type">Annual</span></div>
                         </div>
                     </div>
                     <div class="benchmark" style="background: linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(168, 85, 247, 0.05)); border-color: var(--accent-purple);">
-                        <div class="label">GMV if → 0.7</div>
+                        <div class="label">→ 0.7 NDCG</div>
                         <div class="values">
-                            <div class="value" style="color: var(--accent-purple);"><span id="gmv-opp-07">--</span></div>
+                            <div class="value" style="color: var(--accent-purple);"><span id="gmv-opp-07">--</span><span class="type">Period</span></div>
+                            <div class="value" style="color: var(--accent-purple); font-size: 1.1rem;"><span id="gmv-opp-07-annual">--</span><span class="type">Annual</span></div>
                         </div>
                     </div>
                     <div class="benchmark" style="background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.05)); border-color: var(--accent-green);">
-                        <div class="label">GMV if → 0.8</div>
+                        <div class="label">→ 0.8 NDCG</div>
                         <div class="values">
-                            <div class="value" style="color: var(--accent-green);"><span id="gmv-opp-08">--</span></div>
+                            <div class="value" style="color: var(--accent-green);"><span id="gmv-opp-08">--</span><span class="type">Period</span></div>
+                            <div class="value" style="color: var(--accent-green); font-size: 1.1rem;"><span id="gmv-opp-08-annual">--</span><span class="type">Annual</span></div>
                         </div>
                     </div>
                 </div>
                 
                 <div style="padding: 0.75rem 1rem; background: var(--bg-secondary); border-radius: 8px; margin-bottom: 1rem; font-size: 0.8rem; color: var(--text-secondary);">
-                    <strong>💡 Model:</strong> Research suggests ~15% GMV increase per 10% NDCG improvement in ranking systems. 
+                    <strong>💡 Model:</strong> Research suggests ~15% GMV increase per 10% NDCG improvement in ranking systems. <strong>Annual projections</strong> = period value × (365 / days_back). 
                     This table shows estimated GMV uplift if underperforming dimensions improved their NDCG to the median.
                 </div>
                 
@@ -1217,6 +1220,7 @@ HTML_TEMPLATE = '''
                             <th style="color: var(--accent-blue);">→ 0.6</th>
                             <th style="color: var(--accent-purple);">→ 0.7</th>
                             <th style="color: var(--accent-green);">→ 0.8</th>
+                            <th style="color: var(--accent-purple); font-weight: 700;">📅 Annual (0.7)</th>
                             <th>CTR</th>
                         </tr>
                     </thead>
@@ -1891,11 +1895,21 @@ HTML_TEMPLATE = '''
                 }
                 
                 // Update summary cards
+                const daysBackVal = parseInt(daysBack) || 7;
+                const annualFactor = 365 / daysBackVal;
+                
                 document.getElementById('gmv-total').textContent = formatCurrency(data.overall.total_gmv || 0);
                 document.getElementById('gmv-ndcg-avg').textContent = (data.overall.avg_ndcg || 0).toFixed(3);
+                
+                // Period values
                 document.getElementById('gmv-opp-06').textContent = '+' + formatCurrency(data.total_opp_06 || 0);
                 document.getElementById('gmv-opp-07').textContent = '+' + formatCurrency(data.total_opp_07 || 0);
                 document.getElementById('gmv-opp-08').textContent = '+' + formatCurrency(data.total_opp_08 || 0);
+                
+                // Annualized values
+                document.getElementById('gmv-opp-06-annual').textContent = '+' + formatCurrency((data.total_opp_06 || 0) * annualFactor);
+                document.getElementById('gmv-opp-07-annual').textContent = '+' + formatCurrency((data.total_opp_07 || 0) * annualFactor);
+                document.getElementById('gmv-opp-08-annual').textContent = '+' + formatCurrency((data.total_opp_08 || 0) * annualFactor);
                 
                 // Show top 3 opportunities as cards (based on 0.7 target)
                 const topItems = data.items.filter(i => i.gmv_opp_07 > 0).sort((a, b) => b.gmv_opp_07 - a.gmv_opp_07).slice(0, 3);
@@ -1927,6 +1941,7 @@ HTML_TEMPLATE = '''
                     const hasOpp06 = item.gmv_opp_06 > 0;
                     const hasOpp07 = item.gmv_opp_07 > 0;
                     const hasOpp08 = item.gmv_opp_08 > 0;
+                    const annualOpp07 = hasOpp07 ? item.gmv_opp_07 * annualFactor : 0;
                     tbody.innerHTML += `
                         <tr>
                             <td class="dimension-name">
@@ -1944,6 +1959,9 @@ HTML_TEMPLATE = '''
                             </td>
                             <td class="metric-value" style="${hasOpp08 ? 'color: var(--accent-green); font-weight: 600;' : 'color: var(--text-secondary);'}">
                                 ${hasOpp08 ? '+' + formatCurrency(item.gmv_opp_08) : '--'}
+                            </td>
+                            <td class="metric-value" style="${hasOpp07 ? 'color: var(--accent-purple); font-weight: 700; background: rgba(168, 85, 247, 0.1);' : 'color: var(--text-secondary);'}">
+                                ${hasOpp07 ? '+' + formatCurrency(annualOpp07) : '--'}
                             </td>
                             <td class="metric-value">${item.ctr.toFixed(2)}%</td>
                         </tr>
