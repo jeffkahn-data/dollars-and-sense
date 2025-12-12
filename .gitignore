@@ -1,0 +1,60 @@
+# Credentials and secrets
+*.json
+credentials/
+secrets/
+.env
+.env.local
+
+# Query results and data exports
+*.csv
+*.parquet
+*.xlsx
+data/
+exports/
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+*.ipynb
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+.venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# dbt artifacts (if using local dbt)
+target/
+dbt_packages/
+dbt_modules/
+logs/
+
+# Test artifacts
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+

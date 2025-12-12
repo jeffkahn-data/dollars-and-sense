@@ -1,0 +1,531 @@
+# Algorithms Entity Definition
+# ML models and logic that generate/rank recommendations
+#
+# The recommendation system has three layers:
+# L1 - Candidate Generation (Recall): Generate candidate products
+# L2 - Reranking: Score and rank candidates (key layer for NDCG)
+# L3 - Post-processing: Apply business logic
+#
+# Key Metrics:
+# - Recall@K: Measures coverage (L1 quality) - are relevant items in candidates?
+# - NDCG@K: Measures ranking quality (L2 quality) - are relevant items ranked high?
+# - CTR/CVR: End-to-end performance metrics
+
+entity_type: algorithm
+description: |
+  An Algorithm represents a machine learning model or business logic component
+  used in the recommendation system. Algorithms are organized into three layers:
+  L1 (Candidate Generation), L2 (Reranking), and L3 (Post-processing).
+  
+  L1 algorithms are evaluated by Recall@K (candidate coverage).
+  L2 algorithms are evaluated by NDCG@K (ranking quality).
+  All algorithms are evaluated by CTR/CVR (end-to-end performance).
+
+primary_key: algorithm_id
+
+# Algorithm instances organized by layer
+instances:
+  # ============================================
+  # L1 - Candidate Generation (Recall) - Batch
+  # ============================================
+  - algorithm_id: recent_interactions_batch
+    name: Recent Interactions (Batch)
+    layer: L1
+    layer_name: Candidate Generation
+    processing_type: batch
+    refresh_cadence_hours: 12
+    description: |
+      Last 90 day purchases on Shop and Shop Pay, plus last 90 days clicks on Shop.
+      Products ranked by number of PDP views and then recency of interaction.
+    candidates_per_user: 200
+    input_features:
+      - purchase_history_90d
+      - click_history_90d
+      - pdp_views
+    recall_at_100: 0.33
+    ctr_benchmark: null
+    cvr_benchmark: null
+    active: true
+
+  - algorithm_id: merchant_slim
+    name: Merchant SLIM
+    layer: L1
+    layer_name: Candidate Generation
+    processing_type: batch
+    refresh_cadence_hours: 24
+    description: |
+      Sparse Linear Method at merchant level. Learns merchant-merchant similarity
+      from past purchases and high-affinity interactions. Returns top 200 merchants,
+      then picks up to 10 products per merchant reflecting buyer's gender preferences.
+    candidates_per_user: 200
+    input_features:
+      - merchant_purchase_history
+      - high_affinity_interactions
+      - gender_preferences
+    recall_at_100: 0.19
+    ctr_benchmark: 0.008  # 0.8%
+    cvr_benchmark: null
+    active: true
+
+  - algorithm_id: product_slim
+    name: Product SLIM
+    layer: L1
+    layer_name: Candidate Generation
+    processing_type: batch
+    refresh_cadence_hours: 24
+    description: |
+      Sparse Linear Method on users interacting with products.
+      Top 800K products chosen as the interaction universe.
+      Showed 15% incremental recall over existing sources.
+    candidates_per_user: 200
+    input_features:
+      - product_interactions
+    recall_at_100: 0.22
+    ctr_benchmark: 0.008
+    cvr_benchmark: 0.00054
+    active: true
+
+  - algorithm_id: hstu
+    name: HSTU (Hierarchical Sequence Transduction Units)
+    layer: L1
+    layer_name: Candidate Generation
+    processing_type: batch
+    refresh_cadence_hours: 24
+    description: |
+      Generative model trained on 13 months of Shop app events.
+      Uses RoPE (Rotary Position Embeddings) for temporal encoding.
+      Processes user interaction sequences to predict next interests.
+      Currently trained on 100M users and 5M products.
+    candidates_per_user: 200
+    input_features:
+      - interaction_sequence
+      - temporal_encoding
+    recall_at_100: null
+    ctr_benchmark: 0.009  # 0.9%
+    cvr_benchmark: 0.0006  # 0.060%
+    active: true
+
+  - algorithm_id: nncf_batch
+    name: NNCF (Neural Network Collaborative Filtering) - Batch
+    layer: L1
+    layer_name: Candidate Generation
+    processing_type: batch
+    refresh_cadence_hours: 24
+    description: |
+      BPR (Bayesian Personalized Ranking) CF model.
+      100M users × 5M products with in-batch hard negative sampling.
+      Positive interactions: purchase, add to cart, favorites, PDP view.
+    candidates_per_user: 200
+    input_features:
+      - user_id
+      - product_id
+      - interaction_type
+    recall_at_100: 0.057
+    ctr_benchmark: 0.008
+    cvr_benchmark: 0.00046
+    active: true
+
+  - algorithm_id: llm_cg
+    name: LLM Candidate Generation
+    layer: L1
+    layer_name: Candidate Generation
+    processing_type: batch
+    refresh_cadence_hours: 24
+    description: |
+      Uses LLMs (GPT-4o, Qwen tested) to generate user interest profiles
+      from past purchases, clicks, search history, cart abandons.
+      Generates up to 10 search queries, then uses ANN with Nomic embedding
+      to find 10 products closest to each query.
+    candidates_per_user: 100
+    input_features:
+      - purchase_history
+      - click_history
+      - search_history
+      - cart_abandons
+    recall_at_100: 0.009
+    ctr_benchmark: 0.0092  # v3.1 showed neutral to negative results
+    cvr_benchmark: null
+    active: false  # Currently disabled
+
+  - algorithm_id: neut
+    name: NEUT (Neural Embedding User Tower)
+    layer: L1
+    layer_name: Candidate Generation
+    processing_type: batch
+    refresh_cadence_hours: 24
+    description: |
+      Two-tower model with Product tower fixed using Nomic embeddings.
+      User tower includes recent interactions and past purchases.
+      Uses ANN to generate product matches given user embeddings.
+    candidates_per_user: 200
+    input_features:
+      - recent_interactions
+      - past_purchases
+      - nomic_product_embeddings
+    recall_at_100: 0.0004
+    ctr_benchmark: 0.005
+    cvr_benchmark: 0.00001
+    active: true
+
+  # ============================================
+  # L1 - Candidate Generation (Recall) - Streaming
+  # ============================================
+  - algorithm_id: recently_viewed
+    name: Recently Viewed (Streaming)
+    layer: L1
+    layer_name: Candidate Generation
+    processing_type: streaming
+    refresh_cadence_hours: null  # Real-time
+    description: |
+      Adds products the user has interacted with in current session
+      to the candidate pool. Highest performing CG source.
+    candidates_per_user: 50
+    input_features:
+      - session_interactions
+    recall_at_100: null
+    ctr_benchmark: 0.02  # 2%
+    cvr_benchmark: 0.0017  # 0.17%
+    active: true
+
+  - algorithm_id: nncf_streaming
+    name: NNCF Incremental (Streaming)
+    layer: L1
+    layer_name: Candidate Generation
+    processing_type: streaming
+    refresh_cadence_hours: null  # Updates every 5 minutes
+    description: |
+      Real-time NNCF updates (every 5 minutes) instead of batch.
+      Aims to reduce staleness of recommendations.
+    candidates_per_user: 200
+    input_features:
+      - recent_interactions
+    recall_at_100: null
+    ctr_benchmark: null
+    cvr_benchmark: null
+    active: true
+
+  - algorithm_id: streaming_nearest_neighbors
+    name: Streaming Nearest Neighbors
+    layer: L1
+    layer_name: Candidate Generation
+    processing_type: streaming
+    refresh_cadence_hours: null
+    description: |
+      Find nearest product neighbors based on SLIM matrix
+      to add to the CG pool in real-time.
+    candidates_per_user: 50
+    input_features:
+      - slim_similarity_matrix
+      - recent_interactions
+    recall_at_100: null
+    ctr_benchmark: null
+    cvr_benchmark: null
+    active: true
+
+  # ============================================
+  # L1 - Contextual (Item-to-Item)
+  # ============================================
+  - algorithm_id: nomic_i2i
+    name: Nomic I2I (Image to Image)
+    layer: L1
+    layer_name: Candidate Generation
+    processing_type: batch
+    refresh_cadence_hours: 72  # Every 3 hours for Product Network
+    description: |
+      Generates candidates based on product description similarity
+      using Nomic embeddings. Used for contextual recommendations.
+    candidates_per_user: 100
+    input_features:
+      - product_description
+      - nomic_embeddings
+    recall_at_100: null
+    ctr_benchmark: null
+    cvr_benchmark: null
+    context_type: collection
+    active: true
+
+  - algorithm_id: clip_i2i
+    name: CLIP I2I (Image to Image)
+    layer: L1
+    layer_name: Candidate Generation
+    processing_type: batch
+    refresh_cadence_hours: 72
+    description: |
+      Generates candidates based on product image similarity
+      using CLIP embeddings.
+    candidates_per_user: 100
+    input_features:
+      - product_image
+      - clip_embeddings
+    recall_at_100: null
+    ctr_benchmark: null
+    cvr_benchmark: null
+    context_type: collection
+    active: true
+
+  # ============================================
+  # L2 - Reranking
+  # ============================================
+  - algorithm_id: xgboost_reranker
+    name: XGBoost Reranker (Organic)
+    layer: L2
+    layer_name: Reranking
+    processing_type: inference
+    description: |
+      Learning-to-Rank model that takes ~1000 candidates from L1 sources
+      and ranks using ~250 features. Optimizes for pConv (probability of
+      conversion). Trained on Shop homefeed and ads impressions.
+    feature_count: 250
+    feature_categories:
+      - user_features
+      - product_features
+      - broker_features
+      - user_product_features
+      - user_broker_features
+    objective_function: pConv
+    # NDCG benchmarks - key metric for L2 ranking quality
+    ndcg_at_10: null  # To be computed
+    ndcg_at_20: null  # To be computed
+    ndcg_notes: |
+      Primary reranker - NDCG here indicates overall ranking effectiveness.
+      Low NDCG suggests feature engineering or model updates needed.
+    active: true
+
+  - algorithm_id: xgboost_reranker_ads
+    name: XGBoost Reranker (Ads)
+    layer: L2
+    layer_name: Reranking
+    processing_type: inference
+    description: |
+      Ads-specific reranker (v0.2) that models P(product conversion | impression).
+      Includes campaign features. Uses harmonic mean of pConv and Shop Cash Fees.
+    feature_count: 280  # ~250 + campaign features
+    feature_categories:
+      - user_features
+      - product_features
+      - broker_features
+      - campaign_features
+      - user_product_features
+      - user_broker_features
+    objective_function: harmonic_mean
+    active: true
+
+  - algorithm_id: repurchase_filter
+    name: Repurchase Rate Filter
+    layer: L2
+    layer_name: Reranking
+    processing_type: inference
+    description: |
+      Pre-reranker filter that predicts likelihood of repurchase.
+      Uses 7/30/90 day models based on time since last purchase.
+      Filters out products below repurchase threshold.
+    filter_type: pre_reranker
+    active: true
+
+  - algorithm_id: probabilistic_rank_decay
+    name: Probabilistic Rank Decay
+    layer: L2
+    layer_name: Reranking
+    processing_type: inference
+    description: |
+      Downranks products that the user has previously impressed
+      but not interacted with. Uses Thompson Sampling approach.
+    decay_type: probabilistic
+    active: true
+
+  - algorithm_id: dislike_decay
+    name: Product Dislike Decay
+    layer: L2
+    layer_name: Reranking
+    processing_type: inference
+    description: |
+      Downranks products similar to products the user has disliked.
+      Uses similarity matrix to identify related products.
+    decay_type: similarity_based
+    active: true
+
+  # ============================================
+  # L3 - Post-processing
+  # ============================================
+  - algorithm_id: merchant_aggregation
+    name: Merchant-level Aggregation
+    layer: L3
+    layer_name: Post-processing
+    processing_type: inference
+    description: |
+      Aggregates product-level rankings to merchant level.
+      Takes highest pConv product, ranks merchant, then pads
+      with top 3 other products from same merchant.
+    aggregation_method: max_pconv
+    padding_method: best_sellers
+    active: true
+
+  - algorithm_id: hard_impression_decay
+    name: Hard Impression Decay
+    layer: L3
+    layer_name: Post-processing
+    processing_type: inference
+    description: |
+      Moves previously viewed products/merchants to bottom
+      of ranked list. Applied after reranking.
+    decay_type: hard
+    active: true
+
+  - algorithm_id: diversity_layer
+    name: Diversity Layer
+    layer: L3
+    layer_name: Post-processing
+    processing_type: inference
+    description: |
+      Ensures diverse taxonomy representation in top results.
+      Uses effective number of categories metric.
+    diversity_method: taxonomy_diversification
+    active: true
+
+  - algorithm_id: exploration_thompson
+    name: Thompson Sampling Exploration
+    layer: L3
+    layer_name: Post-processing
+    processing_type: inference
+    description: |
+      Selects products from lower ranks (e.g., rank 200) for exploration.
+      Uses Thompson Sampling to balance explore/exploit.
+    exploration_method: thompson_sampling
+    selection_rank: 200
+    active: true
+
+# Planned/In Development algorithms
+planned_algorithms:
+  - algorithm_id: dpp
+    name: DPP (Determinantal Point Process)
+    layer: L3
+    description: For diversity improvements
+    status: planned
+
+  - algorithm_id: merchant_merchant_slim
+    name: Merchant-Merchant SLIM
+    layer: L1
+    description: To replace legacy TopSimilarBrokers
+    status: ready_for_experimentation
+
+  - algorithm_id: search_cg
+    name: Search CG
+    layer: L1
+    description: Reflect user's recent interests using search history
+    status: planned
+
+  - algorithm_id: trending_cg
+    name: Trending CG
+    layer: L1
+    description: Surface trending products to reranker
+    status: planned
+
+# Attributes schema
+attributes:
+  algorithm_id:
+    type: string
+    description: Unique identifier
+    required: true
+    
+  name:
+    type: string
+    description: Human-readable name
+    required: true
+    
+  layer:
+    type: string
+    description: Algorithm layer
+    enum: [L1, L2, L3]
+    required: true
+    
+  layer_name:
+    type: string
+    description: Full layer name
+    enum: [Candidate Generation, Reranking, Post-processing]
+    required: true
+    
+  processing_type:
+    type: string
+    description: How algorithm runs
+    enum: [batch, streaming, inference]
+    required: true
+    
+  refresh_cadence_hours:
+    type: integer
+    description: Hours between refreshes (null for streaming/inference)
+    required: false
+    
+  description:
+    type: string
+    description: Detailed description
+    required: true
+    
+  candidates_per_user:
+    type: integer
+    description: Number of candidates generated (L1 only)
+    required: false
+    
+  recall_at_100:
+    type: float
+    description: Recall@100 metric (L1 quality - are relevant items in candidates?)
+    required: false
+    
+  ctr_benchmark:
+    type: float
+    description: Expected CTR
+    required: false
+    
+  cvr_benchmark:
+    type: float
+    description: Expected CVR
+    required: false
+    
+  ndcg_at_10:
+    type: float
+    description: |
+      NDCG@10 metric (L2 quality - are relevant items ranked at top?)
+      Measures ranking quality at first scroll position.
+      Primarily relevant for L2 reranking algorithms.
+    required: false
+    
+  ndcg_at_20:
+    type: float
+    description: |
+      NDCG@20 metric for first two scrolls of recommendations.
+      Captures early engagement opportunity ranking quality.
+    required: false
+    
+  ndcg_notes:
+    type: string
+    description: Notes about NDCG interpretation for this algorithm
+    required: false
+    
+  active:
+    type: boolean
+    description: Whether algorithm is currently active
+    required: true
+
+# Related data models
+data_models:
+  impressions: sdp-prd-shop-ml.mart.mart__shop_personalization__recs_super_feed_impressions_metrics
+  recall: sdp-prd-shop-ml.mart.mart__shop_personalization__recs_recall_metrics
+  
+# Performance benchmarks (as of Dec 2024)
+performance_benchmarks:
+  - algorithm_id: recently_viewed
+    ctr: 0.02
+    cvr: 0.0017
+    notes: Highest performing
+  - algorithm_id: hstu
+    ctr: 0.009
+    cvr: 0.0006
+  - algorithm_id: product_slim
+    ctr: 0.008
+    cvr: 0.00054
+  - algorithm_id: nncf_batch
+    ctr: 0.008
+    cvr: 0.00046
+  - algorithm_id: neut
+    ctr: 0.005
+    cvr: 0.00001
+

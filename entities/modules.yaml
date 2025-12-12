@@ -1,0 +1,224 @@
+# Modules (Slots) Entity Definition
+# UI components that render recommendations
+#
+# Modules are the visual containers that display recommendations.
+# They have positions, types, and specific rendering characteristics.
+
+entity_type: module
+description: |
+  A Module (or Slot) represents a UI component that renders recommendations
+  on a page. Modules have positions, types, and specific characteristics
+  that affect how recommendations are displayed and measured.
+
+primary_key: module_id
+
+# Module instances
+instances:
+  # Homefeed Modules
+  - module_id: homefeed_merchant_card
+    name: Homefeed Merchant Card
+    description: Standard merchant card showing 4 products from a single merchant
+    page_id: shop_app_homefeed_organic
+    module_type: merchant_card
+    display_grain: merchant
+    products_per_card: 4
+    padding_strategy: best_sellers  # Pad with merchant's best sellers
+    position_type: ranked
+    max_results: 200  # Top 200 merchants stored
+    max_products_per_entity: 10
+    active: true
+
+  - module_id: homefeed_product_card
+    name: Homefeed Product Card
+    description: Direct product recommendation without merchant context
+    page_id: shop_app_homefeed_organic
+    module_type: product_card
+    display_grain: product
+    products_per_card: 1
+    padding_strategy: null
+    position_type: ranked
+    max_results: 200
+    max_products_per_entity: null
+    active: true
+
+  # Ads Modules
+  - module_id: ads_rail_product_card
+    name: Ads Rail Product Card
+    description: Sponsored product card in ads rail
+    page_id: shop_app_ads_rail
+    module_type: product_card
+    display_grain: product
+    products_per_card: 1
+    padding_strategy: null
+    position_type: ranked
+    max_results: 200
+    max_products_per_entity: null
+    active: true
+
+  - module_id: ads_merchant_card
+    name: Ads Merchant Card
+    description: Sponsored merchant card showing multiple products
+    page_id: shop_app_ads_rail
+    module_type: merchant_card
+    display_grain: merchant
+    products_per_card: 4
+    padding_strategy: best_sellers
+    position_type: ranked
+    max_results: 200
+    max_products_per_entity: 10
+    active: true
+
+  # Special Slots
+  - module_id: exploration_slot
+    name: Exploration Slot
+    description: Slot reserved for exploring lower-ranked products (Thompson Sampling)
+    page_id: shop_app_homefeed_organic
+    module_type: exploration
+    display_grain: product
+    products_per_card: 1
+    padding_strategy: null
+    position_type: exploration  # Selected from lower ranks (e.g., rank 200)
+    max_results: 10
+    max_products_per_entity: null
+    exploration_config:
+      rank_threshold: 200
+      selection_method: thompson_sampling
+    active: true
+
+  - module_id: exploitation_slot
+    name: Exploitation Slot
+    description: Standard slot showing top-ranked products
+    page_id: shop_app_homefeed_organic
+    module_type: exploitation
+    display_grain: product
+    products_per_card: 1
+    padding_strategy: null
+    position_type: ranked
+    max_results: 190  # Top positions
+    max_products_per_entity: null
+    active: true
+
+  # Product Network Modules
+  - module_id: collection_ads_slot
+    name: Collection Ads Slot
+    description: Contextual ads within collection pages
+    page_id: shopify_product_network
+    module_type: contextual_ad
+    display_grain: product
+    products_per_card: 1
+    padding_strategy: null
+    position_type: contextual
+    max_results: 100  # Per collection
+    max_products_per_entity: null
+    active: true
+
+# Module metadata that are also entities
+module_metadata_entities:
+  - metadata_id: section_position
+    name: Section Position
+    description: Y-position of module in the feed
+    attributes:
+      - section_id
+      - section_y_pos
+      - section_y_pos_bucket
+    
+  - metadata_id: algorithm_source
+    name: Algorithm Source
+    description: Which algorithm(s) contributed to this module's content
+    attributes:
+      - algorithm_id
+      - cg_algorithm_id
+      - algorithm_type
+      - algorithms_included
+    
+  - metadata_id: user_segment
+    name: User Segment
+    description: User engagement segment for analysis
+    attributes:
+      - app_user_segment_l365d  # Last 365 days engagement
+
+# Attributes schema
+attributes:
+  module_id:
+    type: string
+    description: Unique identifier for the module
+    required: true
+    
+  name:
+    type: string
+    description: Human-readable name
+    required: true
+    
+  description:
+    type: string
+    description: Detailed description
+    required: true
+    
+  page_id:
+    type: string
+    description: Reference to parent page
+    required: true
+    foreign_key: pages.page_id
+    
+  module_type:
+    type: string
+    description: Type of module
+    enum: [merchant_card, product_card, exploration, exploitation, contextual_ad]
+    required: true
+    
+  display_grain:
+    type: string
+    description: What entity type is displayed
+    enum: [product, merchant, collection]
+    required: true
+    
+  products_per_card:
+    type: integer
+    description: Number of products shown per card
+    required: true
+    
+  padding_strategy:
+    type: string
+    description: How to fill incomplete cards
+    enum: [best_sellers, similar_products, null]
+    required: false
+    
+  position_type:
+    type: string
+    description: How positions are assigned
+    enum: [ranked, exploration, contextual]
+    required: true
+    
+  max_results:
+    type: integer
+    description: Maximum entities stored for this module
+    required: true
+    
+  max_products_per_entity:
+    type: integer
+    description: Max products per merchant (for merchant cards)
+    required: false
+    
+  active:
+    type: boolean
+    description: Whether module is currently active
+    required: true
+
+# Related data models
+data_models:
+  impressions_by_position: sdp-prd-shop-ml.mart.mart__shop_personalization__recs_super_feed_card_position_impressions_metrics
+  padding_metrics: sdp-prd-shop-ml.mart.mart__shop_personalization__recs_merchant_card_padding_metrics
+  
+# Key metrics for modules
+metrics:
+  - name: impressions_by_position
+    description: Impressions broken down by section position
+  - name: ctr_by_position
+    description: CTR by section y-position
+  - name: padding_effectiveness
+    description: Performance of padded vs unified rec products
+  - name: distinct_products_viewed
+    description: Unique products viewed in module
+  - name: is_full_card_viewed
+    description: Whether user saw all products in card
+

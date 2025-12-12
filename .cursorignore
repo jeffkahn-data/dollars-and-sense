@@ -1,0 +1,12 @@
+# Ignore large data files
+*.csv
+*.parquet
+*.xlsx
+data/
+exports/
+
+# Ignore credentials
+credentials/
+secrets/
+.env
+

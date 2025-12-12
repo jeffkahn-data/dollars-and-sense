@@ -1,0 +1,984 @@
+"""
+NDCG Visualizer (Interactive) - HTML visualization with filters and cached images
+
+Features:
+- Filter by product category, user segment, and surface
+- Local image caching (downloads and saves thumbnails)
+- "Generate New Examples" button for randomized results
+- Client-side JavaScript filtering
+
+Usage:
+    python3 tools/ndcg_visualizer_interactive.py [--output-dir tools/output] [--num-sessions 10]
+"""
+
+import argparse
+import hashlib
+import math
+import os
+import random
+import ssl
+import urllib.request
+from datetime import datetime
+from pathlib import Path
+from typing import List, Dict, Optional
+from urllib.error import URLError
+import json
+
+# Create SSL context that doesn't verify certificates (for CDN images)
+SSL_CONTEXT = ssl.create_default_context()
+SSL_CONTEXT.check_hostname = False
+SSL_CONTEXT.verify_mode = ssl.CERT_NONE
+
+# Output directory structure
+OUTPUT_DIR = Path("tools/output")
+IMAGES_DIR = OUTPUT_DIR / "images"
+
+# Sample session data with more variety for filtering
+SAMPLE_SESSION_DATA = [
+    # Session 1 - Toys, Active, Super Feed
+    {
+        "session_id": "09d28e9f-ff0a-4d51",
+        "user_segment": "active",
+        "surface": "super_feed",
+        "timestamp": "2025-12-09 21:46",
+        "trigger_context": "Browsing toy blasters",
+        "primary_category": "Toys & Games",
+        "items": [
+            {"position": 1, "product_id": "8116108230952", "product_title": "Winchester 1894 Repeater Lever Action Shell Ejecting Dart Blaster", "product_image_url": "https://cdn.shopify.com/s/files/1/0702/1192/8360/files/image_e942a46c-fb66-48db-b27f-6fc0a70320e8.jpg", "vendor": "Dart Armoury", "category": "Toys & Games", "clicked": False, "purchased": False, "cg_source": "product_slim"},
+            {"position": 2, "product_id": "8594725765416", "product_title": "Desert Eagle Semiautomatic Blowback Dart Blaster", "product_image_url": "https://cdn.shopify.com/s/files/1/0702/1192/8360/files/IMG-2754.jpg", "vendor": "Dart Armoury", "category": "Toys & Games", "clicked": False, "purchased": False, "cg_source": "hstu"},
+            {"position": 3, "product_id": "9274902282536", "product_title": "M9A3 Pistol Shell Ejecting Toy Gun & Cosplay Prop", "product_image_url": "https://cdn.shopify.com/s/files/1/0702/1192/8360/files/IMG-3941.jpg", "vendor": "Dart Armoury", "category": "Toys & Games", "clicked": False, "purchased": False, "cg_source": "product_nncf"},
+            {"position": 4, "product_id": "15140373660025", "product_title": "Block-17 Shell Ejecting Toy Pistol | Dart Blaster", "product_image_url": "https://cdn.shopify.com/s/files/1/0702/1192/8360/files/IMG-8262.jpg", "vendor": "Dart Armoury", "category": "Toys & Games", "clicked": True, "purchased": True, "cg_source": "recently_viewed"},
+            {"position": 5, "product_id": "6841999229105", "product_title": "Tuscan Orris Ultimate Collection", "product_image_url": "https://cdn.shopify.com/s/files/1/2490/2090/products/Tuscan_Orris_Bundle_1.jpg", "vendor": "Carter + Jane", "category": "Beauty", "clicked": False, "purchased": False, "cg_source": "product_slim"},
+            {"position": 6, "product_id": "7234567890123", "product_title": "Premium Leather Wallet - Minimalist Design", "product_image_url": None, "vendor": "Urban Gear Co", "category": "Accessories", "clicked": False, "purchased": False, "cg_source": "hstu"},
+        ]
+    },
+    # Session 2 - Athletics, Frequent Buyer, Super Feed
+    {
+        "session_id": "857ce4aa-c5f7-4e11",
+        "user_segment": "frequent_buyer",
+        "surface": "super_feed",
+        "timestamp": "2025-12-09 16:23",
+        "trigger_context": "Recent purchase: Athletic wear",
+        "primary_category": "Apparel & Accessories",
+        "items": [
+            {"position": 1, "product_id": "8456789012345", "product_title": "Performance Running Shorts - Quick Dry", "product_image_url": None, "vendor": "ActiveLife", "category": "Apparel & Accessories", "clicked": True, "purchased": True, "cg_source": "recently_viewed"},
+            {"position": 2, "product_id": "8567890123456", "product_title": "Compression Training Tights", "product_image_url": None, "vendor": "ActiveLife", "category": "Apparel & Accessories", "clicked": False, "purchased": False, "cg_source": "product_slim"},
+            {"position": 3, "product_id": "8678901234567", "product_title": "Moisture-Wicking Athletic Socks (3-Pack)", "product_image_url": None, "vendor": "ActiveLife", "category": "Apparel & Accessories", "clicked": False, "purchased": False, "cg_source": "hstu"},
+            {"position": 4, "product_id": "8789012345678", "product_title": "Lightweight Training Jacket", "product_image_url": None, "vendor": "ActiveLife", "category": "Apparel & Accessories", "clicked": False, "purchased": False, "cg_source": "product_nncf"},
+            {"position": 5, "product_id": "8890123456789", "product_title": "Sport Water Bottle - 32oz Insulated", "product_image_url": None, "vendor": "HydroGear", "category": "Sports & Outdoors", "clicked": False, "purchased": False, "cg_source": "product_slim"},
+            {"position": 6, "product_id": "8901234567890", "product_title": "Gym Duffle Bag - Large Capacity", "product_image_url": None, "vendor": "TravelPro", "category": "Sports & Outdoors", "clicked": False, "purchased": False, "cg_source": "hstu"},
+        ]
+    },
+    # Session 3 - Beauty, Active, Super Feed
+    {
+        "session_id": "43f761f6-7d9e-4c9c",
+        "user_segment": "active",
+        "surface": "super_feed",
+        "timestamp": "2025-12-09 02:37",
+        "trigger_context": "Beauty & personal care browsing",
+        "primary_category": "Beauty",
+        "items": [
+            {"position": 1, "product_id": "6621788569698", "product_title": "Double Bubble Makeup Brush Cleanser", "product_image_url": "https://cdn.shopify.com/s/files/1/0072/4847/8306/products/DBCcopy.jpg", "vendor": "J.Cat Beauty", "category": "Beauty", "clicked": True, "purchased": False, "cg_source": "hstu"},
+            {"position": 2, "product_id": "6925865418794", "product_title": "Boost Fullness Nourishing Scalp & Hair Treatment", "product_image_url": None, "vendor": "RevAir", "category": "Beauty", "clicked": False, "purchased": False, "cg_source": "product_slim"},
+            {"position": 3, "product_id": "1845158674530", "product_title": "BR30 Dry Makeup Brush Cleaner", "product_image_url": "https://cdn.shopify.com/s/files/1/0072/4847/8306/products/BR30_Dry_makeup_brush_cleaner_1.jpg", "vendor": "J.Cat Beauty", "category": "Beauty", "clicked": False, "purchased": False, "cg_source": "recently_viewed"},
+            {"position": 4, "product_id": "1795353968738", "product_title": "BR29 Disposable Mascara Wands", "product_image_url": "https://cdn.shopify.com/s/files/1/0072/4847/8306/products/BR29_Main_final.jpg", "vendor": "J.Cat Beauty", "category": "Beauty", "clicked": False, "purchased": False, "cg_source": "product_nncf"},
+            {"position": 5, "product_id": "6925865025578", "product_title": "Revitalizing Shampoo (8.5 oz)", "product_image_url": None, "vendor": "RevAir", "category": "Beauty", "clicked": True, "purchased": True, "cg_source": "hstu"},
+            {"position": 6, "product_id": "7163465662673", "product_title": "EGG ONLY Spicy Bowls", "product_image_url": "https://cdn.shopify.com/s/files/1/0583/5590/8817/products/IMG_8018.jpg", "vendor": "Quay's Spicy Bowls", "category": "Food & Beverage", "clicked": False, "purchased": False, "cg_source": "product_slim"},
+        ]
+    },
+    # Session 4 - Electronics, New User, Super Feed
+    {
+        "session_id": "14907e87-2421-4cbb",
+        "user_segment": "new_user",
+        "surface": "super_feed",
+        "timestamp": "2025-12-09 18:55",
+        "trigger_context": "First-time visitor exploration",
+        "primary_category": "Electronics",
+        "items": [
+            {"position": 1, "product_id": "9012345678901", "product_title": "Wireless Bluetooth Earbuds - Premium Sound", "product_image_url": None, "vendor": "SoundWave", "category": "Electronics", "clicked": False, "purchased": False, "cg_source": "hstu"},
+            {"position": 2, "product_id": "9123456789012", "product_title": "Phone Stand - Adjustable Aluminum", "product_image_url": None, "vendor": "TechGear", "category": "Electronics", "clicked": False, "purchased": False, "cg_source": "product_slim"},
+            {"position": 3, "product_id": "9234567890123", "product_title": "USB-C Fast Charging Cable (6ft)", "product_image_url": None, "vendor": "TechGear", "category": "Electronics", "clicked": True, "purchased": True, "cg_source": "product_nncf"},
+            {"position": 4, "product_id": "9345678901234", "product_title": "Laptop Sleeve - 15 inch Waterproof", "product_image_url": None, "vendor": "TechGear", "category": "Electronics", "clicked": False, "purchased": False, "cg_source": "hstu"},
+            {"position": 5, "product_id": "9456789012345", "product_title": "Portable Power Bank - 20000mAh", "product_image_url": None, "vendor": "ChargeMax", "category": "Electronics", "clicked": True, "purchased": False, "cg_source": "recently_viewed"},
+            {"position": 6, "product_id": "9567890123456", "product_title": "Webcam HD 1080p with Microphone", "product_image_url": None, "vendor": "StreamPro", "category": "Electronics", "clicked": False, "purchased": False, "cg_source": "product_slim"},
+        ]
+    },
+    # Session 5 - Food, Dormant, Super Feed
+    {
+        "session_id": "64fa97c7-12e5-4942",
+        "user_segment": "dormant",
+        "surface": "super_feed",
+        "timestamp": "2025-12-09 14:12",
+        "trigger_context": "Re-engagement campaign",
+        "primary_category": "Food & Beverage",
+        "items": [
+            {"position": 1, "product_id": "1234567890123", "product_title": "Organic Green Tea - 100 Sachets", "product_image_url": None, "vendor": "TeaHouse", "category": "Food & Beverage", "clicked": False, "purchased": False, "cg_source": "hstu"},
+            {"position": 2, "product_id": "2345678901234", "product_title": "Ceramic Tea Infuser Mug", "product_image_url": None, "vendor": "TeaHouse", "category": "Home & Kitchen", "clicked": False, "purchased": False, "cg_source": "product_slim"},
+            {"position": 3, "product_id": "3456789012345", "product_title": "Honey Sticks - Raw Organic (50 pack)", "product_image_url": None, "vendor": "HoneyBee Co", "category": "Food & Beverage", "clicked": True, "purchased": False, "cg_source": "recently_viewed"},
+            {"position": 4, "product_id": "4567890123456", "product_title": "Japanese Matcha Powder - Ceremonial Grade", "product_image_url": None, "vendor": "TeaHouse", "category": "Food & Beverage", "clicked": False, "purchased": False, "cg_source": "product_nncf"},
+            {"position": 5, "product_id": "5678901234567", "product_title": "Electric Kettle - Variable Temperature", "product_image_url": None, "vendor": "KitchenPro", "category": "Home & Kitchen", "clicked": False, "purchased": False, "cg_source": "hstu"},
+            {"position": 6, "product_id": "6789012345678", "product_title": "Tea Storage Tin Set (4 piece)", "product_image_url": None, "vendor": "TeaHouse", "category": "Home & Kitchen", "clicked": True, "purchased": True, "cg_source": "product_slim"},
+        ]
+    },
+    # Session 6 - Home, New User, PDP
+    {
+        "session_id": "abc12345-6789-def0",
+        "user_segment": "new_user",
+        "surface": "pdp",
+        "timestamp": "2025-12-09 10:30",
+        "trigger_context": "Viewing: Modern Floor Lamp",
+        "primary_category": "Home & Kitchen",
+        "items": [
+            {"position": 1, "product_id": "1111222233334", "product_title": "Modern Floor Lamp - Adjustable Height", "product_image_url": None, "vendor": "LightCraft", "category": "Home & Kitchen", "clicked": False, "purchased": False, "cg_source": "hstu"},
+            {"position": 2, "product_id": "2222333344445", "product_title": "Smart LED Bulb - Color Changing", "product_image_url": None, "vendor": "SmartHome", "category": "Home & Kitchen", "clicked": True, "purchased": True, "cg_source": "product_slim"},
+            {"position": 3, "product_id": "3333444455556", "product_title": "Minimalist Side Table - Walnut", "product_image_url": None, "vendor": "ModernLiving", "category": "Home & Kitchen", "clicked": False, "purchased": False, "cg_source": "recently_viewed"},
+            {"position": 4, "product_id": "4444555566667", "product_title": "Decorative Throw Pillow Set", "product_image_url": None, "vendor": "CozyHome", "category": "Home & Kitchen", "clicked": True, "purchased": False, "cg_source": "product_nncf"},
+            {"position": 5, "product_id": "5555666677778", "product_title": "Wool Area Rug 5x7 - Gray", "product_image_url": None, "vendor": "RugCo", "category": "Home & Kitchen", "clicked": False, "purchased": False, "cg_source": "hstu"},
+            {"position": 6, "product_id": "6666777788889", "product_title": "Wall Art Print - Abstract", "product_image_url": None, "vendor": "ArtHouse", "category": "Home & Kitchen", "clicked": False, "purchased": False, "cg_source": "product_slim"},
+        ]
+    },
+    # Session 7 - Apparel, Frequent Buyer, Search
+    {
+        "session_id": "def67890-1234-abc5",
+        "user_segment": "frequent_buyer",
+        "surface": "search",
+        "timestamp": "2025-12-09 15:45",
+        "trigger_context": "Search: 'winter jacket'",
+        "primary_category": "Apparel & Accessories",
+        "items": [
+            {"position": 1, "product_id": "7777888899990", "product_title": "Down Winter Parka - Waterproof", "product_image_url": None, "vendor": "NorthStyle", "category": "Apparel & Accessories", "clicked": False, "purchased": False, "cg_source": "hstu"},
+            {"position": 2, "product_id": "8888999900001", "product_title": "Fleece Lined Winter Coat", "product_image_url": None, "vendor": "WarmWear", "category": "Apparel & Accessories", "clicked": True, "purchased": False, "cg_source": "product_slim"},
+            {"position": 3, "product_id": "9999000011112", "product_title": "Wool Blend Peacoat - Navy", "product_image_url": None, "vendor": "ClassicStyle", "category": "Apparel & Accessories", "clicked": False, "purchased": False, "cg_source": "recently_viewed"},
+            {"position": 4, "product_id": "0000111122223", "product_title": "Lightweight Puffer Jacket", "product_image_url": None, "vendor": "NorthStyle", "category": "Apparel & Accessories", "clicked": True, "purchased": True, "cg_source": "product_nncf"},
+            {"position": 5, "product_id": "1111222233334", "product_title": "Winter Beanie - Merino Wool", "product_image_url": None, "vendor": "WarmWear", "category": "Apparel & Accessories", "clicked": False, "purchased": False, "cg_source": "hstu"},
+            {"position": 6, "product_id": "2222333344445", "product_title": "Insulated Gloves - Touchscreen", "product_image_url": None, "vendor": "WarmWear", "category": "Apparel & Accessories", "clicked": False, "purchased": False, "cg_source": "product_slim"},
+        ]
+    },
+    # Session 8 - Sports, Active, Super Feed
+    {
+        "session_id": "ghi34567-8901-jkl2",
+        "user_segment": "active",
+        "surface": "super_feed",
+        "timestamp": "2025-12-09 08:15",
+        "trigger_context": "Morning browse - Sports gear",
+        "primary_category": "Sports & Outdoors",
+        "items": [
+            {"position": 1, "product_id": "3333444455556", "product_title": "Yoga Mat - Extra Thick 6mm", "product_image_url": None, "vendor": "ZenFit", "category": "Sports & Outdoors", "clicked": False, "purchased": False, "cg_source": "hstu"},
+            {"position": 2, "product_id": "4444555566667", "product_title": "Resistance Bands Set (5 levels)", "product_image_url": None, "vendor": "FitGear", "category": "Sports & Outdoors", "clicked": False, "purchased": False, "cg_source": "product_slim"},
+            {"position": 3, "product_id": "5555666677778", "product_title": "Foam Roller - High Density", "product_image_url": None, "vendor": "RecoverPro", "category": "Sports & Outdoors", "clicked": True, "purchased": False, "cg_source": "recently_viewed"},
+            {"position": 4, "product_id": "6666777788889", "product_title": "Adjustable Dumbbells 5-50lb", "product_image_url": None, "vendor": "PowerLift", "category": "Sports & Outdoors", "clicked": False, "purchased": False, "cg_source": "product_nncf"},
+            {"position": 5, "product_id": "7777888899990", "product_title": "Jump Rope - Speed Training", "product_image_url": None, "vendor": "FitGear", "category": "Sports & Outdoors", "clicked": False, "purchased": False, "cg_source": "hstu"},
+            {"position": 6, "product_id": "8888999900001", "product_title": "Exercise Ball - 65cm Anti-Burst", "product_image_url": None, "vendor": "ZenFit", "category": "Sports & Outdoors", "clicked": True, "purchased": True, "cg_source": "product_slim"},
+        ]
+    },
+]
+
+
+def get_image_filename(url: str) -> str:
+    """Generate a unique filename for an image URL."""
+    if not url:
+        return None
+    url_hash = hashlib.md5(url.encode()).hexdigest()[:12]
+    return f"img_{url_hash}.jpg"
+
+
+def download_image(url: str, output_dir: Path, size: int = 80) -> Optional[str]:
+    """Download and cache an image, returning the local path."""
+    if not url:
+        return None
+    
+    filename = get_image_filename(url)
+    local_path = output_dir / filename
+    relative_path = f"images/{filename}"
+    
+    # Return cached if exists
+    if local_path.exists():
+        return relative_path
+    
+    # Try to download
+    try:
+        # Shopify CDN supports size parameters
+        if "cdn.shopify.com" in url:
+            # Add size parameter for thumbnail
+            if "?" in url:
+                sized_url = f"{url}&width={size}&height={size}"
+            else:
+                sized_url = f"{url}?width={size}&height={size}"
+        else:
+            sized_url = url
+        
+        request = urllib.request.Request(
+            sized_url,
+            headers={'User-Agent': 'Mozilla/5.0 (compatible; NDCGVisualizer/1.0)'}
+        )
+        with urllib.request.urlopen(request, timeout=10, context=SSL_CONTEXT) as response:
+            with open(local_path, 'wb') as f:
+                f.write(response.read())
+        return relative_path
+    except Exception as e:
+        print(f"  ⚠️  Failed to download {url[:50]}...: {e}")
+        return None
+
+
+def get_relevance_score(item: Dict, graded: bool = True) -> int:
+    """Calculate relevance score for an item."""
+    if graded:
+        if item["purchased"]:
+            return 4
+        elif item["clicked"]:
+            return 2
+        else:
+            return 0
+    else:
+        return 1 if item["purchased"] else 0
+
+
+def calculate_dcg(items: List[Dict], k: int = 10, graded: bool = True) -> float:
+    """Calculate DCG@K for a list of items in their given order."""
+    dcg = 0.0
+    for i, item in enumerate(items[:k], start=1):
+        rel = get_relevance_score(item, graded)
+        dcg += rel / math.log2(i + 1)
+    return dcg
+
+
+def calculate_idcg(items: List[Dict], k: int = 10, graded: bool = True) -> float:
+    """Calculate IDCG@K (ideal DCG) - items sorted by relevance."""
+    sorted_items = sorted(items, key=lambda x: get_relevance_score(x, graded), reverse=True)
+    return calculate_dcg(sorted_items, k, graded)
+
+
+def calculate_ndcg(items: List[Dict], k: int = 10, graded: bool = True) -> float:
+    """Calculate NDCG@K."""
+    dcg = calculate_dcg(items, k, graded)
+    idcg = calculate_idcg(items, k, graded)
+    if idcg == 0:
+        return 0.0
+    return dcg / idcg
+
+
+def get_ideal_ranking(items: List[Dict], graded: bool = True) -> List[Dict]:
+    """Return items sorted by relevance (ideal ranking)."""
+    return sorted(items, key=lambda x: get_relevance_score(x, graded), reverse=True)
+
+
+def process_sessions(sessions: List[Dict], images_dir: Path, download_images: bool = True) -> List[Dict]:
+    """Process sessions and download images."""
+    processed = []
+    
+    for session in sessions:
+        processed_session = session.copy()
+        processed_session["items"] = []
+        
+        for item in session["items"]:
+            processed_item = item.copy()
+            
+            # Download image if URL exists
+            if download_images and item.get("product_image_url"):
+                local_path = download_image(item["product_image_url"], images_dir)
+                processed_item["local_image_path"] = local_path
+            else:
+                processed_item["local_image_path"] = None
+            
+            processed_session["items"].append(processed_item)
+        
+        processed.append(processed_session)
+    
+    return processed
+
+
+def generate_html(sessions: List[Dict], output_path: Path):
+    """Generate interactive HTML visualization with filters."""
+    
+    # Extract unique values for filters
+    categories = sorted(set(s.get("primary_category", "Unknown") for s in sessions))
+    segments = sorted(set(s.get("user_segment", "unknown") for s in sessions))
+    surfaces = sorted(set(s.get("surface", "super_feed") for s in sessions))
+    
+    # Convert sessions to JSON for JavaScript
+    sessions_json = json.dumps(sessions, indent=2)
+    
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    html = f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NDCG Ranking Visualizer | Dollars & Sense</title>
+    <style>
+        :root {{
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-card: #1a1a24;
+            --text-primary: #e8e8ed;
+            --text-secondary: #8888a0;
+            --accent-green: #22c55e;
+            --accent-blue: #3b82f6;
+            --accent-purple: #a855f7;
+            --accent-orange: #f97316;
+            --accent-red: #ef4444;
+            --border-color: #2a2a3a;
+        }}
+        
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        
+        body {{
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }}
+        
+        .container {{ max-width: 1600px; margin: 0 auto; padding: 2rem; }}
+        
+        header {{
+            text-align: center;
+            margin-bottom: 2rem;
+            padding: 2rem;
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-card) 100%);
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+        }}
+        
+        header h1 {{
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }}
+        
+        header p {{ color: var(--text-secondary); font-size: 1.1rem; }}
+        
+        /* Filter Controls */
+        .controls {{
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            align-items: flex-end;
+        }}
+        
+        .filter-group {{
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }}
+        
+        .filter-group label {{
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--accent-purple);
+        }}
+        
+        .filter-group select {{
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            min-width: 180px;
+            cursor: pointer;
+        }}
+        
+        .filter-group select:focus {{
+            outline: none;
+            border-color: var(--accent-purple);
+        }}
+        
+        .btn {{
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            border: none;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }}
+        
+        .btn-primary {{
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            color: white;
+        }}
+        
+        .btn-primary:hover {{
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(168, 85, 247, 0.4);
+        }}
+        
+        .btn-secondary {{
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }}
+        
+        .btn-secondary:hover {{
+            border-color: var(--accent-purple);
+        }}
+        
+        .stats-bar {{
+            display: flex;
+            gap: 2rem;
+            margin-left: auto;
+            align-items: center;
+        }}
+        
+        .stat {{
+            text-align: center;
+        }}
+        
+        .stat-value {{
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent-blue);
+        }}
+        
+        .stat-label {{
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }}
+        
+        /* Session Cards */
+        .sessions-container {{ display: flex; flex-direction: column; gap: 2rem; }}
+        
+        .session-card {{
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            overflow: hidden;
+            transition: opacity 0.3s;
+        }}
+        
+        .session-card.hidden {{ display: none; }}
+        
+        .session-header {{
+            background: var(--bg-card);
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }}
+        
+        .session-info {{ display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: center; }}
+        .session-info span {{ color: var(--text-secondary); font-size: 0.85rem; }}
+        .session-info strong {{ color: var(--text-primary); }}
+        
+        .session-tags {{ display: flex; gap: 0.5rem; }}
+        .tag {{
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }}
+        .tag.category {{ background: rgba(168, 85, 247, 0.2); color: var(--accent-purple); }}
+        .tag.segment {{ background: rgba(59, 130, 246, 0.2); color: var(--accent-blue); }}
+        .tag.surface {{ background: rgba(34, 197, 94, 0.2); color: var(--accent-green); }}
+        
+        .trigger-context {{
+            padding: 0.75rem 1.5rem;
+            background: rgba(168, 85, 247, 0.1);
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.9rem;
+        }}
+        .trigger-label {{ color: var(--accent-purple); font-weight: 600; }}
+        
+        .ndcg-score {{
+            font-size: 1.4rem;
+            font-weight: 700;
+            padding: 0.4rem 1.25rem;
+            border-radius: 10px;
+            background: var(--bg-primary);
+        }}
+        .ndcg-score.excellent {{ color: var(--accent-green); border: 2px solid var(--accent-green); }}
+        .ndcg-score.good {{ color: var(--accent-blue); border: 2px solid var(--accent-blue); }}
+        .ndcg-score.fair {{ color: var(--accent-orange); border: 2px solid var(--accent-orange); }}
+        .ndcg-score.poor {{ color: var(--accent-red); border: 2px solid var(--accent-red); }}
+        
+        .rankings-container {{ display: grid; grid-template-columns: 1fr 1fr; }}
+        @media (max-width: 1100px) {{ .rankings-container {{ grid-template-columns: 1fr; }} }}
+        
+        .ranking-panel {{ padding: 1.25rem; }}
+        .ranking-panel:first-child {{ border-right: 1px solid var(--border-color); }}
+        @media (max-width: 1100px) {{
+            .ranking-panel:first-child {{ border-right: none; border-bottom: 1px solid var(--border-color); }}
+        }}
+        
+        .ranking-panel h3 {{
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }}
+        .ranking-panel h3 .dcg-value {{
+            font-family: 'SF Mono', monospace;
+            background: var(--bg-card);
+            padding: 0.2rem 0.6rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            margin-left: auto;
+        }}
+        .actual h3 {{ color: var(--accent-orange); }}
+        .ideal h3 {{ color: var(--accent-green); }}
+        
+        .items-list {{ display: flex; flex-direction: column; gap: 0.6rem; }}
+        
+        .item {{
+            display: flex;
+            align-items: center;
+            padding: 0.6rem 0.8rem;
+            background: var(--bg-card);
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            gap: 0.8rem;
+            transition: transform 0.2s;
+        }}
+        .item:hover {{ transform: translateX(4px); }}
+        
+        .item.purchased {{
+            background: rgba(34, 197, 94, 0.15);
+            border-color: var(--accent-green);
+            box-shadow: 0 0 15px rgba(34, 197, 94, 0.2);
+        }}
+        .item.clicked {{
+            background: rgba(59, 130, 246, 0.15);
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
+        }}
+        
+        .item-position {{
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-primary);
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            flex-shrink: 0;
+        }}
+        .item.purchased .item-position {{ background: var(--accent-green); color: white; }}
+        .item.clicked .item-position {{ background: var(--accent-blue); color: white; }}
+        
+        .item-image {{
+            width: 60px;
+            height: 60px;
+            border-radius: 6px;
+            overflow: hidden;
+            flex-shrink: 0;
+            background: var(--bg-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }}
+        .item-image img {{ width: 100%; height: 100%; object-fit: cover; }}
+        .item-image .placeholder {{
+            font-size: 0.6rem;
+            color: var(--text-secondary);
+            text-align: center;
+            padding: 0.25rem;
+        }}
+        
+        .item-content {{ flex: 1; min-width: 0; }}
+        .item-title {{
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }}
+        .item-vendor {{ font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.1rem; }}
+        .item-meta {{ display: flex; gap: 0.4rem; margin-top: 0.3rem; flex-wrap: wrap; align-items: center; }}
+        .item-cg {{ font-size: 0.65rem; padding: 0.1rem 0.4rem; background: var(--bg-primary); border-radius: 4px; color: var(--accent-purple); }}
+        .item-relevance {{ font-size: 0.65rem; padding: 0.1rem 0.4rem; background: var(--bg-primary); border-radius: 4px; }}
+        
+        .badge {{
+            font-size: 0.6rem;
+            padding: 0.1rem 0.4rem;
+            border-radius: 4px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }}
+        .badge.purchased {{ background: var(--accent-green); color: white; }}
+        .badge.clicked {{ background: var(--accent-blue); color: white; }}
+        
+        .item-dcg {{
+            font-family: 'SF Mono', monospace;
+            font-size: 0.8rem;
+            padding: 0.2rem 0.6rem;
+            background: var(--bg-primary);
+            border-radius: 6px;
+            flex-shrink: 0;
+        }}
+        .item.purchased .item-dcg {{ color: var(--accent-green); }}
+        .item.clicked .item-dcg {{ color: var(--accent-blue); }}
+        
+        .metrics-summary {{
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            padding: 1rem 1.5rem;
+            background: var(--bg-card);
+            border-top: 1px solid var(--border-color);
+        }}
+        .metric {{ text-align: center; }}
+        .metric-label {{ font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); }}
+        .metric-value {{ font-size: 1.1rem; font-weight: 700; font-family: 'SF Mono', monospace; }}
+        
+        footer {{
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }}
+        footer a {{ color: var(--accent-blue); text-decoration: none; }}
+        
+        .legend {{
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-bottom: 1.5rem;
+        }}
+        .legend-item {{ display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; }}
+        .legend-color {{ width: 16px; height: 16px; border-radius: 4px; }}
+        .legend-color.purchased {{ background: var(--accent-green); }}
+        .legend-color.clicked {{ background: var(--accent-blue); }}
+        .legend-color.none {{ background: var(--bg-card); border: 1px solid var(--border-color); }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎯 NDCG Ranking Visualizer</h1>
+            <p>Compare actual recommendation rankings vs ideal rankings with real product data</p>
+        </header>
+        
+        <div class="controls">
+            <div class="filter-group">
+                <label>Category</label>
+                <select id="filter-category">
+                    <option value="all">All Categories</option>
+                    {chr(10).join(f'<option value="{c}">{c}</option>' for c in categories)}
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Segment</label>
+                <select id="filter-segment">
+                    <option value="all">All Segments</option>
+                    {chr(10).join(f'<option value="{s}">{s}</option>' for s in segments)}
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Surface</label>
+                <select id="filter-surface">
+                    <option value="all">All Surfaces</option>
+                    {chr(10).join(f'<option value="{s}">{s}</option>' for s in surfaces)}
+                </select>
+            </div>
+            <button class="btn btn-primary" onclick="applyFilters()">🔍 Apply Filters</button>
+            <button class="btn btn-secondary" onclick="shuffleSessions()">🔀 Shuffle Order</button>
+            <button class="btn btn-secondary" onclick="resetFilters()">↺ Reset</button>
+            <div class="stats-bar">
+                <div class="stat">
+                    <div class="stat-value" id="visible-count">{len(sessions)}</div>
+                    <div class="stat-label">Showing</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="avg-ndcg">--</div>
+                    <div class="stat-label">Avg NDCG</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="legend">
+            <div class="legend-item"><div class="legend-color purchased"></div><span>Purchased (rel=4)</span></div>
+            <div class="legend-item"><div class="legend-color clicked"></div><span>Clicked (rel=2)</span></div>
+            <div class="legend-item"><div class="legend-color none"></div><span>No Interaction (rel=0)</span></div>
+        </div>
+        
+        <div class="sessions-container" id="sessions-container">
+            <!-- Sessions will be rendered by JavaScript -->
+        </div>
+        
+        <footer>
+            <p>Generated by <a href="#">Dollars & Sense</a> | {timestamp}</p>
+            <p>Product data from Shopify BigQuery tables</p>
+        </footer>
+    </div>
+    
+    <script>
+        // Session data
+        const allSessions = {sessions_json};
+        let displayedSessions = [...allSessions];
+        
+        // NDCG calculation functions
+        function getRelevance(item) {{
+            if (item.purchased) return 4;
+            if (item.clicked) return 2;
+            return 0;
+        }}
+        
+        function calculateDCG(items, k = 6) {{
+            let dcg = 0;
+            for (let i = 0; i < Math.min(items.length, k); i++) {{
+                const rel = getRelevance(items[i]);
+                dcg += rel / Math.log2(i + 2);
+            }}
+            return dcg;
+        }}
+        
+        function calculateIDCG(items, k = 6) {{
+            const sorted = [...items].sort((a, b) => getRelevance(b) - getRelevance(a));
+            return calculateDCG(sorted, k);
+        }}
+        
+        function calculateNDCG(items, k = 6) {{
+            const dcg = calculateDCG(items, k);
+            const idcg = calculateIDCG(items, k);
+            return idcg === 0 ? 0 : dcg / idcg;
+        }}
+        
+        function getIdealRanking(items) {{
+            return [...items].sort((a, b) => getRelevance(b) - getRelevance(a));
+        }}
+        
+        function getNDCGClass(ndcg) {{
+            if (ndcg >= 0.8) return 'excellent';
+            if (ndcg >= 0.6) return 'good';
+            if (ndcg >= 0.4) return 'fair';
+            return 'poor';
+        }}
+        
+        function getNDCGColor(ndcg) {{
+            if (ndcg >= 0.8) return 'green';
+            if (ndcg >= 0.6) return 'blue';
+            if (ndcg >= 0.4) return 'orange';
+            return 'red';
+        }}
+        
+        function renderItem(item, position) {{
+            const rel = getRelevance(item);
+            const dcgContrib = rel > 0 ? (rel / Math.log2(position + 1)).toFixed(3) : '0.000';
+            const itemClass = item.purchased ? 'purchased' : (item.clicked ? 'clicked' : '');
+            const badge = item.purchased ? '<span class="badge purchased">PURCHASED</span>' : 
+                          (item.clicked ? '<span class="badge clicked">CLICKED</span>' : '');
+            
+            const imageSrc = item.local_image_path || item.product_image_url;
+            const imageHtml = imageSrc 
+                ? `<img src="${{imageSrc}}" alt="${{item.product_title}}" onerror="this.parentElement.innerHTML='<div class=\\'placeholder\\'>No Image</div>'">`
+                : '<div class="placeholder">No Image</div>';
+            
+            return `
+                <div class="item ${{itemClass}}">
+                    <div class="item-position">${{position}}</div>
+                    <div class="item-image">${{imageHtml}}</div>
+                    <div class="item-content">
+                        <div class="item-title">${{(item.product_title || 'Unknown').substring(0, 40)}}</div>
+                        <div class="item-vendor">${{item.vendor || 'Unknown'}}</div>
+                        <div class="item-meta">
+                            <span class="item-cg">${{item.cg_source || 'unknown'}}</span>
+                            <span class="item-relevance">rel=${{rel}}</span>
+                            ${{badge}}
+                        </div>
+                    </div>
+                    <div class="item-dcg">+${{dcgContrib}}</div>
+                </div>
+            `;
+        }}
+        
+        function renderSession(session) {{
+            const items = session.items.slice(0, 6);
+            const idealItems = getIdealRanking(items);
+            const dcg = calculateDCG(items);
+            const idcg = calculateIDCG(items);
+            const ndcg = calculateNDCG(items);
+            const loss = idcg > 0 ? ((1 - ndcg) * 100).toFixed(1) : 0;
+            
+            const actualItemsHtml = items.map((item, i) => renderItem(item, i + 1)).join('');
+            const idealItemsHtml = idealItems.map((item, i) => renderItem(item, i + 1)).join('');
+            
+            return `
+                <div class="session-card" 
+                     data-category="${{session.primary_category || 'Unknown'}}"
+                     data-segment="${{session.user_segment || 'unknown'}}"
+                     data-surface="${{session.surface || 'super_feed'}}"
+                     data-ndcg="${{ndcg}}">
+                    <div class="session-header">
+                        <div class="session-info">
+                            <span>Session: <strong>${{session.session_id.substring(0, 16)}}</strong></span>
+                            <span>Time: <strong>${{session.timestamp}}</strong></span>
+                            <div class="session-tags">
+                                <span class="tag category">${{session.primary_category || 'Unknown'}}</span>
+                                <span class="tag segment">${{session.user_segment || 'unknown'}}</span>
+                                <span class="tag surface">${{session.surface || 'super_feed'}}</span>
+                            </div>
+                        </div>
+                        <div class="ndcg-score ${{getNDCGClass(ndcg)}}">NDCG: ${{ndcg.toFixed(3)}}</div>
+                    </div>
+                    <div class="trigger-context">
+                        <span class="trigger-label">🔍 Context:</span> ${{session.trigger_context || 'Personalized recommendations'}}
+                    </div>
+                    <div class="rankings-container">
+                        <div class="ranking-panel actual">
+                            <h3>📋 Actual Ranking <span class="dcg-value">DCG = ${{dcg.toFixed(3)}}</span></h3>
+                            <div class="items-list">${{actualItemsHtml}}</div>
+                        </div>
+                        <div class="ranking-panel ideal">
+                            <h3>⭐ Ideal Ranking <span class="dcg-value">IDCG = ${{idcg.toFixed(3)}}</span></h3>
+                            <div class="items-list">${{idealItemsHtml}}</div>
+                        </div>
+                    </div>
+                    <div class="metrics-summary">
+                        <div class="metric"><div class="metric-label">DCG@6</div><div class="metric-value">${{dcg.toFixed(3)}}</div></div>
+                        <div class="metric"><div class="metric-label">IDCG@6</div><div class="metric-value">${{idcg.toFixed(3)}}</div></div>
+                        <div class="metric"><div class="metric-label">NDCG@6</div><div class="metric-value" style="color: var(--accent-${{getNDCGColor(ndcg)}})">${{ndcg.toFixed(3)}}</div></div>
+                        <div class="metric"><div class="metric-label">Ranking Loss</div><div class="metric-value" style="color: var(--accent-orange)">${{loss}}%</div></div>
+                    </div>
+                </div>
+            `;
+        }}
+        
+        function renderAllSessions() {{
+            const container = document.getElementById('sessions-container');
+            container.innerHTML = displayedSessions.map(renderSession).join('');
+            updateStats();
+        }}
+        
+        function applyFilters() {{
+            const categoryFilter = document.getElementById('filter-category').value;
+            const segmentFilter = document.getElementById('filter-segment').value;
+            const surfaceFilter = document.getElementById('filter-surface').value;
+            
+            const cards = document.querySelectorAll('.session-card');
+            let visibleCount = 0;
+            let totalNdcg = 0;
+            
+            cards.forEach(card => {{
+                const category = card.dataset.category;
+                const segment = card.dataset.segment;
+                const surface = card.dataset.surface;
+                const ndcg = parseFloat(card.dataset.ndcg);
+                
+                const matchCategory = categoryFilter === 'all' || category === categoryFilter;
+                const matchSegment = segmentFilter === 'all' || segment === segmentFilter;
+                const matchSurface = surfaceFilter === 'all' || surface === surfaceFilter;
+                
+                if (matchCategory && matchSegment && matchSurface) {{
+                    card.classList.remove('hidden');
+                    visibleCount++;
+                    totalNdcg += ndcg;
+                }} else {{
+                    card.classList.add('hidden');
+                }}
+            }});
+            
+            document.getElementById('visible-count').textContent = visibleCount;
+            document.getElementById('avg-ndcg').textContent = visibleCount > 0 ? (totalNdcg / visibleCount).toFixed(3) : '--';
+        }}
+        
+        function shuffleSessions() {{
+            for (let i = displayedSessions.length - 1; i > 0; i--) {{
+                const j = Math.floor(Math.random() * (i + 1));
+                [displayedSessions[i], displayedSessions[j]] = [displayedSessions[j], displayedSessions[i]];
+            }}
+            renderAllSessions();
+            applyFilters();
+        }}
+        
+        function resetFilters() {{
+            document.getElementById('filter-category').value = 'all';
+            document.getElementById('filter-segment').value = 'all';
+            document.getElementById('filter-surface').value = 'all';
+            displayedSessions = [...allSessions];
+            renderAllSessions();
+        }}
+        
+        function updateStats() {{
+            const cards = document.querySelectorAll('.session-card:not(.hidden)');
+            let totalNdcg = 0;
+            cards.forEach(card => totalNdcg += parseFloat(card.dataset.ndcg));
+            document.getElementById('visible-count').textContent = cards.length;
+            document.getElementById('avg-ndcg').textContent = cards.length > 0 ? (totalNdcg / cards.length).toFixed(3) : '--';
+        }}
+        
+        // Initial render
+        renderAllSessions();
+    </script>
+</body>
+</html>'''
+    
+    with open(output_path, 'w') as f:
+        f.write(html)
+    
+    print(f"✅ Generated interactive visualization: {output_path}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Generate interactive NDCG visualization with cached images")
+    parser.add_argument("--output-dir", default="tools/output",
+                        help="Output directory for HTML and images")
+    parser.add_argument("--num-sessions", type=int, default=8,
+                        help="Number of sessions to include")
+    parser.add_argument("--download-images", action="store_true",
+                        help="Download and cache product images")
+    
+    args = parser.parse_args()
+    
+    output_dir = Path(args.output_dir)
+    images_dir = output_dir / "images"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    images_dir.mkdir(exist_ok=True)
+    
+    sessions = SAMPLE_SESSION_DATA[:args.num_sessions]
+    
+    # Process sessions (download images if requested)
+    if args.download_images:
+        print("📥 Downloading and caching images...")
+        sessions = process_sessions(sessions, images_dir, download_images=True)
+    else:
+        sessions = process_sessions(sessions, images_dir, download_images=False)
+    
+    # Generate HTML
+    output_path = output_dir / "ndcg_visualization.html"
+    generate_html(sessions, output_path)
+    
+    # Print summary
+    print(f"\n📊 Generated {len(sessions)} session examples")
+    print(f"📁 Output directory: {output_dir}")
+    print(f"🖼️  Images directory: {images_dir}")
+    
+    # Calculate stats
+    categories = set(s.get("primary_category", "Unknown") for s in sessions)
+    segments = set(s.get("user_segment", "unknown") for s in sessions)
+    surfaces = set(s.get("surface", "super_feed") for s in sessions)
+    
+    print(f"\n🏷️  Filters available:")
+    print(f"   Categories: {', '.join(sorted(categories))}")
+    print(f"   Segments: {', '.join(sorted(segments))}")
+    print(f"   Surfaces: {', '.join(sorted(surfaces))}")
+    
+    print(f"\n🎯 Open the visualization:")
+    print(f"   open {output_path}")
+
+
+if __name__ == "__main__":
+    main()
+

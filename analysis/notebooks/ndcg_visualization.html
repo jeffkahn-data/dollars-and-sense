@@ -1,0 +1,1849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NDCG Ranking Visualizer | Dollars & Sense</title>
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-card: #1a1a24;
+            --text-primary: #e8e8ed;
+            --text-secondary: #8888a0;
+            --accent-green: #22c55e;
+            --accent-blue: #3b82f6;
+            --accent-purple: #a855f7;
+            --accent-orange: #f97316;
+            --accent-red: #ef4444;
+            --border-color: #2a2a3a;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding: 2rem;
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-card) 100%);
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+        }
+        
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+        
+        header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+        
+        .formula-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 2rem auto;
+            max-width: 900px;
+        }
+        
+        .formula-box h3 {
+            color: var(--accent-purple);
+            margin-bottom: 1rem;
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .formula {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            background: var(--bg-secondary);
+            padding: 1rem;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            color: var(--accent-blue);
+            text-align: center;
+        }
+        
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin: 2rem 0;
+            flex-wrap: wrap;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+        
+        .legend-color.purchased {
+            background: var(--accent-green);
+            box-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+        }
+        
+        .legend-color.clicked {
+            background: var(--accent-blue);
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+        }
+        
+        .legend-color.none {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+        }
+        
+        .session-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+        
+        .session-header {
+            background: var(--bg-card);
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        
+        .session-info {
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
+        
+        .session-info span {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+        
+        .session-info strong {
+            color: var(--text-primary);
+        }
+        
+        .trigger-context {
+            padding: 1rem 1.5rem;
+            background: rgba(168, 85, 247, 0.1);
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.95rem;
+        }
+        
+        .trigger-label {
+            color: var(--accent-purple);
+            font-weight: 600;
+        }
+        
+        .ndcg-score {
+            font-size: 1.5rem;
+            font-weight: 700;
+            padding: 0.5rem 1.5rem;
+            border-radius: 12px;
+            background: var(--bg-primary);
+        }
+        
+        .ndcg-score.excellent {
+            color: var(--accent-green);
+            border: 2px solid var(--accent-green);
+        }
+        
+        .ndcg-score.good {
+            color: var(--accent-blue);
+            border: 2px solid var(--accent-blue);
+        }
+        
+        .ndcg-score.fair {
+            color: var(--accent-orange);
+            border: 2px solid var(--accent-orange);
+        }
+        
+        .ndcg-score.poor {
+            color: var(--accent-red);
+            border: 2px solid var(--accent-red);
+        }
+        
+        .rankings-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+        }
+        
+        @media (max-width: 1100px) {
+            .rankings-container {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .ranking-panel {
+            padding: 1.5rem;
+        }
+        
+        .ranking-panel:first-child {
+            border-right: 1px solid var(--border-color);
+        }
+        
+        @media (max-width: 1100px) {
+            .ranking-panel:first-child {
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+            }
+        }
+        
+        .ranking-panel h3 {
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .ranking-panel h3 .dcg-value {
+            font-family: 'SF Mono', monospace;
+            background: var(--bg-card);
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            margin-left: auto;
+        }
+        
+        .actual h3 {
+            color: var(--accent-orange);
+        }
+        
+        .ideal h3 {
+            color: var(--accent-green);
+        }
+        
+        .items-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        
+        .item {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            background: var(--bg-card);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            transition: transform 0.2s, box-shadow 0.2s;
+            gap: 1rem;
+        }
+        
+        .item:hover {
+            transform: translateX(4px);
+        }
+        
+        .item.purchased {
+            background: rgba(34, 197, 94, 0.15);
+            border-color: var(--accent-green);
+            box-shadow: 0 0 20px rgba(34, 197, 94, 0.2);
+        }
+        
+        .item.clicked {
+            background: rgba(59, 130, 246, 0.15);
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+        }
+        
+        .item-position {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-primary);
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+        
+        .item.purchased .item-position {
+            background: var(--accent-green);
+            color: white;
+        }
+        
+        .item.clicked .item-position {
+            background: var(--accent-blue);
+            color: white;
+        }
+        
+        .item-image {
+            width: 70px;
+            height: 70px;
+            border-radius: 8px;
+            overflow: hidden;
+            flex-shrink: 0;
+            background: var(--bg-secondary);
+        }
+        
+        .item-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .item-content {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .item-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .item-vendor {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 0.15rem;
+        }
+        
+        .item-meta {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.4rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .item-cg {
+            font-size: 0.7rem;
+            padding: 0.15rem 0.5rem;
+            background: var(--bg-primary);
+            border-radius: 4px;
+            color: var(--accent-purple);
+        }
+        
+        .item-relevance {
+            font-size: 0.7rem;
+            padding: 0.15rem 0.5rem;
+            background: var(--bg-primary);
+            border-radius: 4px;
+        }
+        
+        .badge {
+            font-size: 0.65rem;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .badge.purchased {
+            background: var(--accent-green);
+            color: white;
+        }
+        
+        .badge.clicked {
+            background: var(--accent-blue);
+            color: white;
+        }
+        
+        .item-dcg-contribution {
+            font-family: 'SF Mono', monospace;
+            font-size: 0.85rem;
+            padding: 0.25rem 0.75rem;
+            background: var(--bg-primary);
+            border-radius: 6px;
+            flex-shrink: 0;
+        }
+        
+        .item.purchased .item-dcg-contribution {
+            color: var(--accent-green);
+        }
+        
+        .item.clicked .item-dcg-contribution {
+            color: var(--accent-blue);
+        }
+        
+        .metrics-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .metric {
+            text-align: center;
+        }
+        
+        .metric-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+        }
+        
+        .metric-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            font-family: 'SF Mono', monospace;
+        }
+        
+        .interpretation {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+        }
+        
+        .interpretation h3 {
+            color: var(--accent-purple);
+            margin-bottom: 1rem;
+        }
+        
+        .interpretation ul {
+            list-style: none;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+        
+        .interpretation li {
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            border-left: 3px solid var(--accent-blue);
+        }
+        
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+        
+        footer a {
+            color: var(--accent-blue);
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎯 NDCG Ranking Visualizer</h1>
+            <p>Compare actual recommendation rankings vs ideal rankings with real product data</p>
+        </header>
+        
+        <div class="formula-box">
+            <h3>📐 NDCG Formula</h3>
+            <div class="formula">
+                NDCG@K = DCG@K / IDCG@K &nbsp;&nbsp;where&nbsp;&nbsp; DCG@K = Σ(relevance_i / log₂(position_i + 1))
+            </div>
+            <p style="margin-top: 1rem; text-align: center; color: var(--text-secondary); font-size: 0.9rem;">
+                Relevance: <strong style="color: var(--accent-green)">Purchase = 4</strong> | 
+                <strong style="color: var(--accent-blue)">Click = 2</strong> | 
+                No interaction = 0
+            </p>
+        </div>
+        
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color purchased"></div>
+                <span>Purchased (rel=4)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color clicked"></div>
+                <span>Clicked (rel=2)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color none"></div>
+                <span>No Interaction (rel=0)</span>
+            </div>
+        </div>
+        
+        
+        <div class="session-card">
+            <div class="session-header">
+                <div class="session-info">
+                    <span>Session: <strong>09d28e9f-ff0a-4d51</strong></span>
+                    <span>Surface: <strong>super_feed</strong></span>
+                    <span>Segment: <strong>active</strong></span>
+                    <span>Time: <strong>2025-12-09 21:46</strong></span>
+                </div>
+                <div class="ndcg-score fair">
+                    NDCG@6: 0.431
+                </div>
+            </div>
+            
+            <div class="trigger-context">
+                <span class="trigger-label">🔍 Context:</span> Browsing toy blasters
+            </div>
+            
+            <div class="rankings-container">
+                <div class="ranking-panel actual">
+                    <h3>
+                        📋 Actual Ranking (as shown to user)
+                        <span class="dcg-value">DCG = 1.723</span>
+                    </h3>
+                    <div class="items-list">
+                        
+        <div class="item ">
+            <div class="item-position">1</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0702/1192/8360/files/image_e942a46c-fb66-48db-b27f-6fc0a70320e8.jpg" alt="Winchester 1894 Repeater Lever Action Shell E" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Winchester 1894 Repeater Lever Action Shell E</div>
+                <div class="item-vendor">Dart Armoury</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_slim</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">2</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0702/1192/8360/files/IMG-2754.jpg" alt="Desert Eagle Semiautomatic Blowback Dart Blas" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Desert Eagle Semiautomatic Blowback Dart Blas</div>
+                <div class="item-vendor">Dart Armoury</div>
+                <div class="item-meta">
+                    <span class="item-cg">hstu</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">3</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0702/1192/8360/files/IMG-3941.jpg" alt="M9A3 Pistol Shell Ejecting Toy Gun & Cosplay " onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">M9A3 Pistol Shell Ejecting Toy Gun & Cosplay </div>
+                <div class="item-vendor">Dart Armoury</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_nncf</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item purchased">
+            <div class="item-position">4</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0702/1192/8360/files/IMG-8262.jpg" alt="Block-17 Shell Ejecting Toy Pistol | Dart Bla" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Block-17 Shell Ejecting Toy Pistol | Dart Bla</div>
+                <div class="item-vendor">Dart Armoury</div>
+                <div class="item-meta">
+                    <span class="item-cg">recently_viewed</span>
+                    <span class="item-relevance">rel=4</span>
+                    <span class="badge purchased">PURCHASED</span>
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+1.723</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">5</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/2490/2090/products/Tuscan_Orris_Bundle_1.jpg" alt="Tuscan Orris Ultimate Collection" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Tuscan Orris Ultimate Collection</div>
+                <div class="item-vendor">Carter + Jane</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_slim</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">6</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0702/1192/8360/files/wallet-1.jpg" alt="Premium Leather Wallet - Minimalist Design" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Premium Leather Wallet - Minimalist Design</div>
+                <div class="item-vendor">Urban Gear Co</div>
+                <div class="item-meta">
+                    <span class="item-cg">hstu</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+                    </div>
+                </div>
+                
+                <div class="ranking-panel ideal">
+                    <h3>
+                        ⭐ Ideal Ranking (IDCG - sorted by relevance)
+                        <span class="dcg-value">IDCG = 4.000</span>
+                    </h3>
+                    <div class="items-list">
+                        
+        <div class="item purchased">
+            <div class="item-position">1</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0702/1192/8360/files/IMG-8262.jpg" alt="Block-17 Shell Ejecting Toy Pistol | Dart Bla" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Block-17 Shell Ejecting Toy Pistol | Dart Bla</div>
+                <div class="item-vendor">Dart Armoury</div>
+                <div class="item-meta">
+                    <span class="item-cg">recently_viewed</span>
+                    <span class="item-relevance">rel=4</span>
+                    <span class="badge purchased">PURCHASED</span>
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+4.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">2</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0702/1192/8360/files/image_e942a46c-fb66-48db-b27f-6fc0a70320e8.jpg" alt="Winchester 1894 Repeater Lever Action Shell E" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Winchester 1894 Repeater Lever Action Shell E</div>
+                <div class="item-vendor">Dart Armoury</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_slim</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">3</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0702/1192/8360/files/IMG-2754.jpg" alt="Desert Eagle Semiautomatic Blowback Dart Blas" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Desert Eagle Semiautomatic Blowback Dart Blas</div>
+                <div class="item-vendor">Dart Armoury</div>
+                <div class="item-meta">
+                    <span class="item-cg">hstu</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">4</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0702/1192/8360/files/IMG-3941.jpg" alt="M9A3 Pistol Shell Ejecting Toy Gun & Cosplay " onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">M9A3 Pistol Shell Ejecting Toy Gun & Cosplay </div>
+                <div class="item-vendor">Dart Armoury</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_nncf</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">5</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/2490/2090/products/Tuscan_Orris_Bundle_1.jpg" alt="Tuscan Orris Ultimate Collection" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Tuscan Orris Ultimate Collection</div>
+                <div class="item-vendor">Carter + Jane</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_slim</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">6</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0702/1192/8360/files/wallet-1.jpg" alt="Premium Leather Wallet - Minimalist Design" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Premium Leather Wallet - Minimalist Design</div>
+                <div class="item-vendor">Urban Gear Co</div>
+                <div class="item-meta">
+                    <span class="item-cg">hstu</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+                    </div>
+                </div>
+            </div>
+            
+            <div class="metrics-summary">
+                <div class="metric">
+                    <div class="metric-label">DCG@6</div>
+                    <div class="metric-value">1.723</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">IDCG@6</div>
+                    <div class="metric-value">4.000</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">NDCG@6</div>
+                    <div class="metric-value" style="color: var(--accent-orange)">0.431</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Ranking Loss</div>
+                    <div class="metric-value" style="color: var(--accent-orange)">56.9%</div>
+                </div>
+            </div>
+        </div>
+    
+        <div class="session-card">
+            <div class="session-header">
+                <div class="session-info">
+                    <span>Session: <strong>857ce4aa-c5f7-4e11</strong></span>
+                    <span>Surface: <strong>super_feed</strong></span>
+                    <span>Segment: <strong>frequent_buyer</strong></span>
+                    <span>Time: <strong>2025-12-09 16:23</strong></span>
+                </div>
+                <div class="ndcg-score excellent">
+                    NDCG@6: 1.000
+                </div>
+            </div>
+            
+            <div class="trigger-context">
+                <span class="trigger-label">🔍 Context:</span> Recent purchase: Athletic wear
+            </div>
+            
+            <div class="rankings-container">
+                <div class="ranking-panel actual">
+                    <h3>
+                        📋 Actual Ranking (as shown to user)
+                        <span class="dcg-value">DCG = 4.000</span>
+                    </h3>
+                    <div class="items-list">
+                        
+        <div class="item purchased">
+            <div class="item-position">1</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0567/8901/2345/products/running-shorts.jpg" alt="Performance Running Shorts - Quick Dry" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Performance Running Shorts - Quick Dry</div>
+                <div class="item-vendor">ActiveLife</div>
+                <div class="item-meta">
+                    <span class="item-cg">recently_viewed</span>
+                    <span class="item-relevance">rel=4</span>
+                    <span class="badge purchased">PURCHASED</span>
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+4.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">2</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0567/8901/2345/products/compression-tights.jpg" alt="Compression Training Tights" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Compression Training Tights</div>
+                <div class="item-vendor">ActiveLife</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_slim</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">3</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0567/8901/2345/products/athletic-socks.jpg" alt="Moisture-Wicking Athletic Socks (3-Pack)" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Moisture-Wicking Athletic Socks (3-Pack)</div>
+                <div class="item-vendor">ActiveLife</div>
+                <div class="item-meta">
+                    <span class="item-cg">hstu</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">4</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0567/8901/2345/products/training-jacket.jpg" alt="Lightweight Training Jacket" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Lightweight Training Jacket</div>
+                <div class="item-vendor">ActiveLife</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_nncf</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">5</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0567/8901/2345/products/water-bottle.jpg" alt="Sport Water Bottle - 32oz Insulated" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Sport Water Bottle - 32oz Insulated</div>
+                <div class="item-vendor">HydroGear</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_slim</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">6</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0567/8901/2345/products/gym-bag.jpg" alt="Gym Duffle Bag - Large Capacity" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Gym Duffle Bag - Large Capacity</div>
+                <div class="item-vendor">TravelPro</div>
+                <div class="item-meta">
+                    <span class="item-cg">hstu</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+                    </div>
+                </div>
+                
+                <div class="ranking-panel ideal">
+                    <h3>
+                        ⭐ Ideal Ranking (IDCG - sorted by relevance)
+                        <span class="dcg-value">IDCG = 4.000</span>
+                    </h3>
+                    <div class="items-list">
+                        
+        <div class="item purchased">
+            <div class="item-position">1</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0567/8901/2345/products/running-shorts.jpg" alt="Performance Running Shorts - Quick Dry" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Performance Running Shorts - Quick Dry</div>
+                <div class="item-vendor">ActiveLife</div>
+                <div class="item-meta">
+                    <span class="item-cg">recently_viewed</span>
+                    <span class="item-relevance">rel=4</span>
+                    <span class="badge purchased">PURCHASED</span>
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+4.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">2</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0567/8901/2345/products/compression-tights.jpg" alt="Compression Training Tights" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Compression Training Tights</div>
+                <div class="item-vendor">ActiveLife</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_slim</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">3</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0567/8901/2345/products/athletic-socks.jpg" alt="Moisture-Wicking Athletic Socks (3-Pack)" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Moisture-Wicking Athletic Socks (3-Pack)</div>
+                <div class="item-vendor">ActiveLife</div>
+                <div class="item-meta">
+                    <span class="item-cg">hstu</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">4</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0567/8901/2345/products/training-jacket.jpg" alt="Lightweight Training Jacket" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Lightweight Training Jacket</div>
+                <div class="item-vendor">ActiveLife</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_nncf</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">5</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0567/8901/2345/products/water-bottle.jpg" alt="Sport Water Bottle - 32oz Insulated" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Sport Water Bottle - 32oz Insulated</div>
+                <div class="item-vendor">HydroGear</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_slim</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">6</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0567/8901/2345/products/gym-bag.jpg" alt="Gym Duffle Bag - Large Capacity" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Gym Duffle Bag - Large Capacity</div>
+                <div class="item-vendor">TravelPro</div>
+                <div class="item-meta">
+                    <span class="item-cg">hstu</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+                    </div>
+                </div>
+            </div>
+            
+            <div class="metrics-summary">
+                <div class="metric">
+                    <div class="metric-label">DCG@6</div>
+                    <div class="metric-value">4.000</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">IDCG@6</div>
+                    <div class="metric-value">4.000</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">NDCG@6</div>
+                    <div class="metric-value" style="color: var(--accent-green)">1.000</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Ranking Loss</div>
+                    <div class="metric-value" style="color: var(--accent-orange)">0.0%</div>
+                </div>
+            </div>
+        </div>
+    
+        <div class="session-card">
+            <div class="session-header">
+                <div class="session-info">
+                    <span>Session: <strong>43f761f6-7d9e-4c9c</strong></span>
+                    <span>Surface: <strong>super_feed</strong></span>
+                    <span>Segment: <strong>active</strong></span>
+                    <span>Time: <strong>2025-12-09 02:37</strong></span>
+                </div>
+                <div class="ndcg-score good">
+                    NDCG@6: 0.674
+                </div>
+            </div>
+            
+            <div class="trigger-context">
+                <span class="trigger-label">🔍 Context:</span> Beauty & personal care browsing
+            </div>
+            
+            <div class="rankings-container">
+                <div class="ranking-panel actual">
+                    <h3>
+                        📋 Actual Ranking (as shown to user)
+                        <span class="dcg-value">DCG = 3.547</span>
+                    </h3>
+                    <div class="items-list">
+                        
+        <div class="item clicked">
+            <div class="item-position">1</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0072/4847/8306/products/DBCcopy.jpg" alt="Double Bubble Makeup Brush Cleanser" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Double Bubble Makeup Brush Cleanser</div>
+                <div class="item-vendor">J.Cat Beauty</div>
+                <div class="item-meta">
+                    <span class="item-cg">hstu</span>
+                    <span class="item-relevance">rel=2</span>
+                    <span class="badge clicked">CLICKED</span>
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+2.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">2</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/2439/0067/files/BF_LeaveInTreatment_PDP_Ingredients.jpg" alt="Boost Fullness Nourishing Scalp & Hair Treatm" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Boost Fullness Nourishing Scalp & Hair Treatm</div>
+                <div class="item-vendor">RevAir</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_slim</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">3</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0072/4847/8306/products/BR30_Dry_makeup_brush_cleaner_1.jpg" alt="BR30 Dry Makeup Brush Cleaner" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">BR30 Dry Makeup Brush Cleaner</div>
+                <div class="item-vendor">J.Cat Beauty</div>
+                <div class="item-meta">
+                    <span class="item-cg">recently_viewed</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">4</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0072/4847/8306/products/BR29_Main_final.jpg" alt="BR29 Disposable Mascara Wands" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">BR29 Disposable Mascara Wands</div>
+                <div class="item-vendor">J.Cat Beauty</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_nncf</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item purchased">
+            <div class="item-position">5</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/2439/0067/files/BF_Shampoo_PDP_Ingredients.jpg" alt="Revitalizing Shampoo (8.5 oz)" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Revitalizing Shampoo (8.5 oz)</div>
+                <div class="item-vendor">RevAir</div>
+                <div class="item-meta">
+                    <span class="item-cg">hstu</span>
+                    <span class="item-relevance">rel=4</span>
+                    <span class="badge purchased">PURCHASED</span>
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+1.547</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">6</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0583/5590/8817/products/IMG_8018.jpg" alt="EGG ONLY Spicy Bowls" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">EGG ONLY Spicy Bowls</div>
+                <div class="item-vendor">Quay's Spicy Bowls</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_slim</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+                    </div>
+                </div>
+                
+                <div class="ranking-panel ideal">
+                    <h3>
+                        ⭐ Ideal Ranking (IDCG - sorted by relevance)
+                        <span class="dcg-value">IDCG = 5.262</span>
+                    </h3>
+                    <div class="items-list">
+                        
+        <div class="item purchased">
+            <div class="item-position">1</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/2439/0067/files/BF_Shampoo_PDP_Ingredients.jpg" alt="Revitalizing Shampoo (8.5 oz)" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Revitalizing Shampoo (8.5 oz)</div>
+                <div class="item-vendor">RevAir</div>
+                <div class="item-meta">
+                    <span class="item-cg">hstu</span>
+                    <span class="item-relevance">rel=4</span>
+                    <span class="badge purchased">PURCHASED</span>
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+4.000</div>
+        </div>
+    
+        <div class="item clicked">
+            <div class="item-position">2</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0072/4847/8306/products/DBCcopy.jpg" alt="Double Bubble Makeup Brush Cleanser" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Double Bubble Makeup Brush Cleanser</div>
+                <div class="item-vendor">J.Cat Beauty</div>
+                <div class="item-meta">
+                    <span class="item-cg">hstu</span>
+                    <span class="item-relevance">rel=2</span>
+                    <span class="badge clicked">CLICKED</span>
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+1.262</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">3</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/2439/0067/files/BF_LeaveInTreatment_PDP_Ingredients.jpg" alt="Boost Fullness Nourishing Scalp & Hair Treatm" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Boost Fullness Nourishing Scalp & Hair Treatm</div>
+                <div class="item-vendor">RevAir</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_slim</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">4</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0072/4847/8306/products/BR30_Dry_makeup_brush_cleaner_1.jpg" alt="BR30 Dry Makeup Brush Cleaner" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">BR30 Dry Makeup Brush Cleaner</div>
+                <div class="item-vendor">J.Cat Beauty</div>
+                <div class="item-meta">
+                    <span class="item-cg">recently_viewed</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">5</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0072/4847/8306/products/BR29_Main_final.jpg" alt="BR29 Disposable Mascara Wands" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">BR29 Disposable Mascara Wands</div>
+                <div class="item-vendor">J.Cat Beauty</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_nncf</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">6</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0583/5590/8817/products/IMG_8018.jpg" alt="EGG ONLY Spicy Bowls" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">EGG ONLY Spicy Bowls</div>
+                <div class="item-vendor">Quay's Spicy Bowls</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_slim</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+                    </div>
+                </div>
+            </div>
+            
+            <div class="metrics-summary">
+                <div class="metric">
+                    <div class="metric-label">DCG@6</div>
+                    <div class="metric-value">3.547</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">IDCG@6</div>
+                    <div class="metric-value">5.262</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">NDCG@6</div>
+                    <div class="metric-value" style="color: var(--accent-blue)">0.674</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Ranking Loss</div>
+                    <div class="metric-value" style="color: var(--accent-orange)">32.6%</div>
+                </div>
+            </div>
+        </div>
+    
+        <div class="session-card">
+            <div class="session-header">
+                <div class="session-info">
+                    <span>Session: <strong>14907e87-2421-4cbb</strong></span>
+                    <span>Surface: <strong>super_feed</strong></span>
+                    <span>Segment: <strong>new_user</strong></span>
+                    <span>Time: <strong>2025-12-09 18:55</strong></span>
+                </div>
+                <div class="ndcg-score fair">
+                    NDCG@6: 0.527
+                </div>
+            </div>
+            
+            <div class="trigger-context">
+                <span class="trigger-label">🔍 Context:</span> First-time visitor exploration
+            </div>
+            
+            <div class="rankings-container">
+                <div class="ranking-panel actual">
+                    <h3>
+                        📋 Actual Ranking (as shown to user)
+                        <span class="dcg-value">DCG = 2.774</span>
+                    </h3>
+                    <div class="items-list">
+                        
+        <div class="item ">
+            <div class="item-position">1</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0789/0123/4567/products/earbuds-1.jpg" alt="Wireless Bluetooth Earbuds - Premium Sound" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Wireless Bluetooth Earbuds - Premium Sound</div>
+                <div class="item-vendor">SoundWave</div>
+                <div class="item-meta">
+                    <span class="item-cg">hstu</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">2</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0789/0123/4567/products/phone-stand.jpg" alt="Phone Stand - Adjustable Aluminum" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Phone Stand - Adjustable Aluminum</div>
+                <div class="item-vendor">TechGear</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_slim</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item purchased">
+            <div class="item-position">3</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0789/0123/4567/products/usb-cable.jpg" alt="USB-C Fast Charging Cable (6ft)" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">USB-C Fast Charging Cable (6ft)</div>
+                <div class="item-vendor">TechGear</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_nncf</span>
+                    <span class="item-relevance">rel=4</span>
+                    <span class="badge purchased">PURCHASED</span>
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+2.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">4</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0789/0123/4567/products/laptop-sleeve.jpg" alt="Laptop Sleeve - 15 inch Waterproof" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Laptop Sleeve - 15 inch Waterproof</div>
+                <div class="item-vendor">TechGear</div>
+                <div class="item-meta">
+                    <span class="item-cg">hstu</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item clicked">
+            <div class="item-position">5</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0789/0123/4567/products/power-bank.jpg" alt="Portable Power Bank - 20000mAh" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Portable Power Bank - 20000mAh</div>
+                <div class="item-vendor">ChargeMax</div>
+                <div class="item-meta">
+                    <span class="item-cg">recently_viewed</span>
+                    <span class="item-relevance">rel=2</span>
+                    <span class="badge clicked">CLICKED</span>
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.774</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">6</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0789/0123/4567/products/webcam.jpg" alt="Webcam HD 1080p with Microphone" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Webcam HD 1080p with Microphone</div>
+                <div class="item-vendor">StreamPro</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_slim</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+                    </div>
+                </div>
+                
+                <div class="ranking-panel ideal">
+                    <h3>
+                        ⭐ Ideal Ranking (IDCG - sorted by relevance)
+                        <span class="dcg-value">IDCG = 5.262</span>
+                    </h3>
+                    <div class="items-list">
+                        
+        <div class="item purchased">
+            <div class="item-position">1</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0789/0123/4567/products/usb-cable.jpg" alt="USB-C Fast Charging Cable (6ft)" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">USB-C Fast Charging Cable (6ft)</div>
+                <div class="item-vendor">TechGear</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_nncf</span>
+                    <span class="item-relevance">rel=4</span>
+                    <span class="badge purchased">PURCHASED</span>
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+4.000</div>
+        </div>
+    
+        <div class="item clicked">
+            <div class="item-position">2</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0789/0123/4567/products/power-bank.jpg" alt="Portable Power Bank - 20000mAh" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Portable Power Bank - 20000mAh</div>
+                <div class="item-vendor">ChargeMax</div>
+                <div class="item-meta">
+                    <span class="item-cg">recently_viewed</span>
+                    <span class="item-relevance">rel=2</span>
+                    <span class="badge clicked">CLICKED</span>
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+1.262</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">3</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0789/0123/4567/products/earbuds-1.jpg" alt="Wireless Bluetooth Earbuds - Premium Sound" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Wireless Bluetooth Earbuds - Premium Sound</div>
+                <div class="item-vendor">SoundWave</div>
+                <div class="item-meta">
+                    <span class="item-cg">hstu</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">4</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0789/0123/4567/products/phone-stand.jpg" alt="Phone Stand - Adjustable Aluminum" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Phone Stand - Adjustable Aluminum</div>
+                <div class="item-vendor">TechGear</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_slim</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">5</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0789/0123/4567/products/laptop-sleeve.jpg" alt="Laptop Sleeve - 15 inch Waterproof" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Laptop Sleeve - 15 inch Waterproof</div>
+                <div class="item-vendor">TechGear</div>
+                <div class="item-meta">
+                    <span class="item-cg">hstu</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">6</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0789/0123/4567/products/webcam.jpg" alt="Webcam HD 1080p with Microphone" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Webcam HD 1080p with Microphone</div>
+                <div class="item-vendor">StreamPro</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_slim</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+                    </div>
+                </div>
+            </div>
+            
+            <div class="metrics-summary">
+                <div class="metric">
+                    <div class="metric-label">DCG@6</div>
+                    <div class="metric-value">2.774</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">IDCG@6</div>
+                    <div class="metric-value">5.262</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">NDCG@6</div>
+                    <div class="metric-value" style="color: var(--accent-orange)">0.527</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Ranking Loss</div>
+                    <div class="metric-value" style="color: var(--accent-orange)">47.3%</div>
+                </div>
+            </div>
+        </div>
+    
+        <div class="session-card">
+            <div class="session-header">
+                <div class="session-info">
+                    <span>Session: <strong>64fa97c7-12e5-4942</strong></span>
+                    <span>Surface: <strong>super_feed</strong></span>
+                    <span>Segment: <strong>dormant</strong></span>
+                    <span>Time: <strong>2025-12-09 14:12</strong></span>
+                </div>
+                <div class="ndcg-score fair">
+                    NDCG@6: 0.461
+                </div>
+            </div>
+            
+            <div class="trigger-context">
+                <span class="trigger-label">🔍 Context:</span> Re-engagement campaign
+            </div>
+            
+            <div class="rankings-container">
+                <div class="ranking-panel actual">
+                    <h3>
+                        📋 Actual Ranking (as shown to user)
+                        <span class="dcg-value">DCG = 2.425</span>
+                    </h3>
+                    <div class="items-list">
+                        
+        <div class="item ">
+            <div class="item-position">1</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0234/5678/9012/products/green-tea.jpg" alt="Organic Green Tea - 100 Sachets" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Organic Green Tea - 100 Sachets</div>
+                <div class="item-vendor">TeaHouse</div>
+                <div class="item-meta">
+                    <span class="item-cg">hstu</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">2</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0234/5678/9012/products/tea-mug.jpg" alt="Ceramic Tea Infuser Mug" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Ceramic Tea Infuser Mug</div>
+                <div class="item-vendor">TeaHouse</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_slim</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item clicked">
+            <div class="item-position">3</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0234/5678/9012/products/honey-sticks.jpg" alt="Honey Sticks - Raw Organic (50 pack)" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Honey Sticks - Raw Organic (50 pack)</div>
+                <div class="item-vendor">HoneyBee Co</div>
+                <div class="item-meta">
+                    <span class="item-cg">recently_viewed</span>
+                    <span class="item-relevance">rel=2</span>
+                    <span class="badge clicked">CLICKED</span>
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+1.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">4</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0234/5678/9012/products/matcha.jpg" alt="Japanese Matcha Powder - Ceremonial Grade" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Japanese Matcha Powder - Ceremonial Grade</div>
+                <div class="item-vendor">TeaHouse</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_nncf</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">5</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0234/5678/9012/products/kettle.jpg" alt="Electric Kettle - Variable Temperature" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Electric Kettle - Variable Temperature</div>
+                <div class="item-vendor">KitchenPro</div>
+                <div class="item-meta">
+                    <span class="item-cg">hstu</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item purchased">
+            <div class="item-position">6</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0234/5678/9012/products/tea-tins.jpg" alt="Tea Storage Tin Set (4 piece)" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Tea Storage Tin Set (4 piece)</div>
+                <div class="item-vendor">TeaHouse</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_slim</span>
+                    <span class="item-relevance">rel=4</span>
+                    <span class="badge purchased">PURCHASED</span>
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+1.425</div>
+        </div>
+    
+                    </div>
+                </div>
+                
+                <div class="ranking-panel ideal">
+                    <h3>
+                        ⭐ Ideal Ranking (IDCG - sorted by relevance)
+                        <span class="dcg-value">IDCG = 5.262</span>
+                    </h3>
+                    <div class="items-list">
+                        
+        <div class="item purchased">
+            <div class="item-position">1</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0234/5678/9012/products/tea-tins.jpg" alt="Tea Storage Tin Set (4 piece)" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Tea Storage Tin Set (4 piece)</div>
+                <div class="item-vendor">TeaHouse</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_slim</span>
+                    <span class="item-relevance">rel=4</span>
+                    <span class="badge purchased">PURCHASED</span>
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+4.000</div>
+        </div>
+    
+        <div class="item clicked">
+            <div class="item-position">2</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0234/5678/9012/products/honey-sticks.jpg" alt="Honey Sticks - Raw Organic (50 pack)" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Honey Sticks - Raw Organic (50 pack)</div>
+                <div class="item-vendor">HoneyBee Co</div>
+                <div class="item-meta">
+                    <span class="item-cg">recently_viewed</span>
+                    <span class="item-relevance">rel=2</span>
+                    <span class="badge clicked">CLICKED</span>
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+1.262</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">3</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0234/5678/9012/products/green-tea.jpg" alt="Organic Green Tea - 100 Sachets" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Organic Green Tea - 100 Sachets</div>
+                <div class="item-vendor">TeaHouse</div>
+                <div class="item-meta">
+                    <span class="item-cg">hstu</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">4</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0234/5678/9012/products/tea-mug.jpg" alt="Ceramic Tea Infuser Mug" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Ceramic Tea Infuser Mug</div>
+                <div class="item-vendor">TeaHouse</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_slim</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">5</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0234/5678/9012/products/matcha.jpg" alt="Japanese Matcha Powder - Ceremonial Grade" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Japanese Matcha Powder - Ceremonial Grade</div>
+                <div class="item-vendor">TeaHouse</div>
+                <div class="item-meta">
+                    <span class="item-cg">product_nncf</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+        <div class="item ">
+            <div class="item-position">6</div>
+            <div class="item-image">
+                <img src="https://cdn.shopify.com/s/files/1/0234/5678/9012/products/kettle.jpg" alt="Electric Kettle - Variable Temperature" onerror="this.src='https://via.placeholder.com/80x80?text=No+Image'">
+            </div>
+            <div class="item-content">
+                <div class="item-title">Electric Kettle - Variable Temperature</div>
+                <div class="item-vendor">KitchenPro</div>
+                <div class="item-meta">
+                    <span class="item-cg">hstu</span>
+                    <span class="item-relevance">rel=0</span>
+                    
+                </div>
+            </div>
+            <div class="item-dcg-contribution">+0.000</div>
+        </div>
+    
+                    </div>
+                </div>
+            </div>
+            
+            <div class="metrics-summary">
+                <div class="metric">
+                    <div class="metric-label">DCG@6</div>
+                    <div class="metric-value">2.425</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">IDCG@6</div>
+                    <div class="metric-value">5.262</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">NDCG@6</div>
+                    <div class="metric-value" style="color: var(--accent-orange)">0.461</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Ranking Loss</div>
+                    <div class="metric-value" style="color: var(--accent-orange)">53.9%</div>
+                </div>
+            </div>
+        </div>
+    
+        
+        <div class="interpretation">
+            <h3>📊 How to Interpret NDCG</h3>
+            <ul>
+                <li>
+                    <strong>NDCG = 1.0:</strong> Perfect ranking - all purchased/clicked items at the very top
+                </li>
+                <li>
+                    <strong>NDCG ≥ 0.8:</strong> Excellent - reranker is placing relevant items near the top
+                </li>
+                <li>
+                    <strong>NDCG 0.6-0.8:</strong> Good - some room for improvement in ranking
+                </li>
+                <li>
+                    <strong>NDCG &lt; 0.6:</strong> Opportunity - significant potential to improve ranking quality
+                </li>
+            </ul>
+        </div>
+        
+        <footer>
+            <p>Generated by <a href="#">Dollars & Sense</a> | 2025-12-12 13:26:22</p>
+            <p>Product data from: sdp-prd-merchandising.products_and_pricing_intermediate.products_extended</p>
+            <p>Image data from: sdp-prd-shop-ml.intermediate.intermediate__product_images_v2</p>
+        </footer>
+    </div>
+</body>
+</html>

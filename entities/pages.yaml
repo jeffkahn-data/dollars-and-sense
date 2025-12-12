@@ -1,0 +1,242 @@
+# Pages (Surfaces) Entity Definition
+# Where recommendations are displayed to users
+#
+# Naming convention follows Shopify DW standards:
+# - Entities use plural nouns
+# - IDs use snake_case with _id suffix
+# - Timestamps use _at suffix
+#
+# Key Metrics per Page:
+# - CTR/CVR: Engagement and conversion rates
+# - Recall@K: Candidate quality (L1)
+# - NDCG@K: Ranking quality (L2) - measures if relevant items are at top
+
+entity_type: page
+description: |
+  A Page (or Surface) represents a location in the Shopify ecosystem where 
+  recommendations are displayed to buyers. Each page has specific characteristics
+  including recommendation grain (product vs merchant), trigger events, and 
+  business objectives.
+  
+  Pages should be evaluated using both coverage (Recall@K) and ranking quality 
+  (NDCG@K) metrics to identify whether issues are in L1 (candidate generation)
+  or L2 (reranking).
+
+primary_key: page_id
+
+# Page instances with their attributes
+instances:
+  - page_id: shop_app_homefeed_organic
+    name: Shop App Homefeed (Organic)
+    description: Main homefeed in Shop app showing organic product recommendations
+    platform: shop_app
+    recommendation_type: organic
+    recommendation_grain: merchant  # Displayed as merchant cards
+    input_corpus: shop_catalog  # All recommendable products in Shop Catalog
+    trigger_events:
+      - app_boot
+      - home_feed_load
+      - shop_page_load
+      - product_page_load
+      - pull_to_refresh
+    objective_function: pConv  # Probability of conversion
+    results_storage: bigtable
+    ubi_type: ubi_controller
+    active: true
+
+  - page_id: shop_app_ads_rail
+    name: Shop App Ads Rail
+    description: Ads rail in Shop app showing sponsored product recommendations
+    platform: shop_app
+    recommendation_type: ads
+    recommendation_grain: product
+    input_corpus: ads_corpus  # Products with active Shop Campaigns
+    trigger_events:
+      - app_boot
+      - home_feed_load
+      - shop_page_load
+      - product_page_load
+      - pull_to_refresh
+      - shoppay_session_create
+    objective_function: harmonic_mean  # Balance pConv and Shop Cash Fees
+    results_storage: bigtable
+    ubi_type: ubi_advertising
+    active: true
+
+  - page_id: shop_app_offers_page
+    name: Shop App Offers Page
+    description: Dedicated offers page in Shop app (1P Ads)
+    platform: shop_app
+    recommendation_type: ads
+    recommendation_grain: product
+    input_corpus: ads_corpus
+    trigger_events:
+      - offers_page_load
+    objective_function: harmonic_mean
+    results_storage: bigtable
+    ubi_type: ubi_advertising
+    active: true
+
+  - page_id: shop_offers_email
+    name: Shop Offers Email
+    description: Email campaigns with personalized offers (1P Ads)
+    platform: email
+    recommendation_type: ads
+    recommendation_grain: product
+    input_corpus: ads_corpus
+    trigger_events:
+      - email_send
+    objective_function: harmonic_mean
+    results_storage: bigtable
+    ubi_type: ubi_advertising
+    active: true
+
+  - page_id: shop_store
+    name: Shop Store
+    description: Individual merchant store pages within Shop
+    platform: shop_app
+    recommendation_type: organic
+    recommendation_grain: product
+    input_corpus: merchant_catalog  # Products from specific merchant
+    trigger_events:
+      - shop_page_load
+    objective_function: pConv
+    results_storage: bigtable
+    ubi_type: ubi_controller
+    active: true
+
+  - page_id: shop_order_management
+    name: Shop Order Management
+    description: Order tracking and management screens
+    platform: shop_app
+    recommendation_type: organic
+    recommendation_grain: product
+    input_corpus: shop_catalog
+    trigger_events:
+      - order_page_load
+    objective_function: pConv
+    results_storage: bigtable
+    ubi_type: ubi_controller
+    active: true
+
+  - page_id: shop_email
+    name: Shop Email
+    description: Non-advertising email communications with product recommendations
+    platform: email
+    recommendation_type: organic
+    recommendation_grain: product
+    input_corpus: shop_catalog
+    trigger_events:
+      - email_send
+    objective_function: pConv
+    results_storage: bigtable
+    ubi_type: ubi_controller
+    active: true
+
+  - page_id: shopify_product_network
+    name: Shopify Product Network
+    description: 2P Ads on merchant storefronts (Collection pages)
+    platform: storefront
+    recommendation_type: ads
+    recommendation_grain: product
+    input_corpus: ads_corpus
+    trigger_events:
+      - collection_page_load
+    objective_function: harmonic_mean
+    results_storage: kafka
+    ubi_type: ubi_advertising
+    active: true
+
+# Attributes schema
+attributes:
+  page_id:
+    type: string
+    description: Unique identifier for the page
+    required: true
+    
+  name:
+    type: string
+    description: Human-readable name
+    required: true
+    
+  description:
+    type: string
+    description: Detailed description of the page's purpose
+    required: true
+    
+  platform:
+    type: string
+    description: Platform where the page exists
+    enum: [shop_app, email, storefront, web]
+    required: true
+    
+  recommendation_type:
+    type: string
+    description: Type of recommendations shown
+    enum: [organic, ads]
+    required: true
+    
+  recommendation_grain:
+    type: string
+    description: Granularity of recommendations displayed
+    enum: [product, merchant, collection]
+    required: true
+    
+  input_corpus:
+    type: string
+    description: Product set used for recommendations
+    enum: [shop_catalog, ads_corpus, merchant_catalog]
+    required: true
+    
+  trigger_events:
+    type: array
+    items: string
+    description: Events that trigger recommendation inference
+    required: true
+    
+  objective_function:
+    type: string
+    description: What the page optimizes for
+    enum: [pConv, harmonic_mean, ctr, hq_ctr]
+    required: true
+    
+  results_storage:
+    type: string
+    description: Where recommendations are stored
+    enum: [bigtable, kafka]
+    required: true
+    
+  ubi_type:
+    type: string
+    description: User behavior identifier type
+    enum: [ubi_controller, ubi_advertising]
+    required: true
+    
+  active:
+    type: boolean
+    description: Whether the page is currently active
+    required: true
+
+# Related data models for querying
+data_models:
+  impressions: sdp-prd-shop-ml.product_recommendation.intermediate__shop_personalization__recs_impressions_enriched
+  orders: sdp-prd-shop-ml.product_recommendation.intermediate__shop_personalization__recs_orders_enriched
+  metrics: sdp-prd-shop-ml.mart.mart__shop_personalization__recs_super_feed_impressions_metrics_daily
+  
+# Key metrics to track for pages
+metrics:
+  - name: impressions
+    description: Total number of recommendation impressions
+  - name: clicks
+    description: Number of clicks on recommendations
+  - name: orders
+    description: Number of orders attributed to recommendations
+  - name: ctr
+    description: Click-through rate (clicks / impressions)
+  - name: cvr
+    description: Conversion rate (orders / impressions)
+  - name: hq_ctr
+    description: High-quality click-through rate
+  - name: revenue_usd
+    description: Total revenue attributed to recommendations
+

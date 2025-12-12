@@ -1,0 +1,402 @@
+# Recall and Ranking Metrics Entity Definition
+# Evaluation metrics for algorithm performance
+#
+# This file defines two types of metrics:
+# 1. Recall@K - Measures coverage (are relevant items in top K?)
+# 2. NDCG@K - Measures ranking quality (are relevant items ranked correctly?)
+
+entity_type: ranking_metric
+description: |
+  Ranking metrics evaluate recommendation system performance:
+  - Recall@K: Percentage of actual purchases that appeared in top-K recommendations
+  - NDCG@K: Normalized Discounted Cumulative Gain measures ranking quality by
+    comparing actual ranking to ideal ranking. NDCG captures position quality -
+    whether relevant items appear early in the list.
+
+primary_key: metric_id
+
+# Recall set instances
+instances:
+  # Product-level Recall (L3P)
+  - recall_set_id: l3p_recall_at_1
+    name: L3P Recall@1
+    description: Product-level recall at K=1
+    recall_level: product
+    k_value: 1
+    metric_name: recall_at_1
+    evaluation_type: offline
+    positive_event: purchase
+    data_model: sdp-prd-shop-ml.measures.measures__shop_personalization__l3p_recall_at_1_ttest
+    active: true
+
+  - recall_set_id: l3p_recall_at_2
+    name: L3P Recall@2
+    description: Product-level recall at K=2
+    recall_level: product
+    k_value: 2
+    metric_name: recall_at_2
+    evaluation_type: offline
+    positive_event: purchase
+    data_model: sdp-prd-shop-ml.measures.measures__shop_personalization__l3p_recall_at_2_ttest
+    active: true
+
+  - recall_set_id: l3p_recall_at_10
+    name: L3P Recall@10
+    description: Product-level recall at K=10
+    recall_level: product
+    k_value: 10
+    metric_name: recall_at_10
+    evaluation_type: offline
+    positive_event: purchase
+    data_model: sdp-prd-shop-ml.measures.measures__shop_personalization__l3p_recall_at_10_ttest
+    active: true
+
+  - recall_set_id: l3p_recall_at_100
+    name: L3P Recall@100
+    description: Product-level recall at K=100
+    recall_level: product
+    k_value: 100
+    metric_name: recall_at_100
+    evaluation_type: offline
+    positive_event: purchase
+    data_model: sdp-prd-shop-ml.measures.measures__shop_personalization__l3p_recall_at_100_ttest
+    active: true
+
+  # Merchant-level Recall (L3M)
+  - recall_set_id: l3m_recall_at_1
+    name: L3M Recall@1
+    description: Merchant-level recall at K=1
+    recall_level: merchant
+    k_value: 1
+    metric_name: recall_at_1
+    evaluation_type: offline
+    positive_event: purchase
+    data_model: sdp-prd-shop-ml.measures.measures__shop_personalization__l3m_recall_at_1_ttest
+    active: true
+
+  - recall_set_id: l3m_recall_at_2
+    name: L3M Recall@2
+    description: Merchant-level recall at K=2
+    recall_level: merchant
+    k_value: 2
+    metric_name: recall_at_2
+    evaluation_type: offline
+    positive_event: purchase
+    data_model: sdp-prd-shop-ml.measures.measures__shop_personalization__l3m_recall_at_2_ttest
+    active: true
+
+  - recall_set_id: l3m_recall_at_10
+    name: L3M Recall@10
+    description: Merchant-level recall at K=10
+    recall_level: merchant
+    k_value: 10
+    metric_name: recall_at_10
+    evaluation_type: offline
+    positive_event: purchase
+    data_model: sdp-prd-shop-ml.measures.measures__shop_personalization__l3m_recall_at_10_ttest
+    active: true
+
+  - recall_set_id: l3m_recall_at_100
+    name: L3M Recall@100
+    description: Merchant-level recall at K=100
+    recall_level: merchant
+    k_value: 100
+    metric_name: recall_at_100
+    evaluation_type: offline
+    positive_event: purchase
+    data_model: sdp-prd-shop-ml.measures.measures__shop_personalization__l3m_recall_at_100_ttest
+    active: true
+
+  # Online Recall (used in experiments)
+  - recall_set_id: online_recall_product
+    name: Online Product Recall
+    description: Real-time product recall measured during experiments
+    recall_level: product
+    k_value: variable
+    metric_name: online_recall
+    evaluation_type: online
+    positive_event: purchase
+    data_model: sdp-prd-shop-ml.mart.mart__shop_personalization__recs_recall_metrics
+    experiment_integration: true
+    active: true
+
+  - recall_set_id: online_recall_merchant
+    name: Online Merchant Recall
+    description: Real-time merchant recall measured during experiments
+    recall_level: merchant
+    k_value: variable
+    metric_name: online_recall
+    evaluation_type: online
+    positive_event: purchase
+    data_model: sdp-prd-shop-ml.mart.mart__shop_personalization__recs_recall_metrics
+    experiment_integration: true
+    active: true
+
+  # ============================================
+  # NDCG (Normalized Discounted Cumulative Gain)
+  # ============================================
+  # NDCG measures ranking quality - are relevant items at the top?
+  
+  - metric_id: ndcg_binary_at_10
+    name: NDCG@10 (Binary Relevance)
+    description: |
+      Ranking quality at K=10 using binary relevance (1=converted, 0=not).
+      Measures if purchased items are ranked near the top of recommendations.
+    metric_type: ndcg
+    k_value: 10
+    relevance_type: binary
+    positive_events: [purchase]
+    evaluation_type: computed
+    data_model: computed_from_impressions_enriched
+    active: true
+
+  - metric_id: ndcg_binary_at_20
+    name: NDCG@20 (Binary Relevance)
+    description: |
+      Ranking quality at K=20 using binary relevance.
+      Captures first two scrolls of feed experience.
+    metric_type: ndcg
+    k_value: 20
+    relevance_type: binary
+    positive_events: [purchase]
+    evaluation_type: computed
+    data_model: computed_from_impressions_enriched
+    active: true
+
+  - metric_id: ndcg_binary_at_100
+    name: NDCG@100 (Binary Relevance)
+    description: |
+      Ranking quality at K=100 using binary relevance.
+      Comprehensive ranking evaluation across full candidate set.
+    metric_type: ndcg
+    k_value: 100
+    relevance_type: binary
+    positive_events: [purchase]
+    evaluation_type: computed
+    data_model: computed_from_impressions_enriched
+    active: true
+
+  - metric_id: ndcg_graded_at_10
+    name: NDCG@10 (Graded Relevance)
+    description: |
+      Ranking quality at K=10 using graded relevance scores:
+      Purchase=4, Add-to-Cart=3, Click=2, View=1, None=0
+    metric_type: ndcg
+    k_value: 10
+    relevance_type: graded
+    relevance_weights:
+      purchase: 4
+      add_to_cart: 3
+      click: 2
+      view: 1
+      none: 0
+    evaluation_type: computed
+    data_model: computed_from_impressions_enriched
+    active: true
+
+  - metric_id: ndcg_graded_at_20
+    name: NDCG@20 (Graded Relevance)
+    description: |
+      Ranking quality at K=20 using graded relevance scores.
+      More nuanced ranking evaluation including engagement signals.
+    metric_type: ndcg
+    k_value: 20
+    relevance_type: graded
+    relevance_weights:
+      purchase: 4
+      add_to_cart: 3
+      click: 2
+      view: 1
+      none: 0
+    evaluation_type: computed
+    data_model: computed_from_impressions_enriched
+    active: true
+
+  - metric_id: ndcg_click_at_10
+    name: NDCG@10 (Click Relevance)
+    description: |
+      Ranking quality at K=10 optimizing for clicks.
+      Useful for CTR optimization analysis.
+    metric_type: ndcg
+    k_value: 10
+    relevance_type: binary
+    positive_events: [click]
+    evaluation_type: computed
+    data_model: computed_from_impressions_enriched
+    active: true
+
+# Recall by Algorithm (aggregated view)
+recall_by_algorithm:
+  - algorithm_id: recent_interactions_batch
+    recall_at_100: 0.33
+    notes: Highest recall among batch CGs
+    
+  - algorithm_id: product_slim
+    recall_at_100: 0.22
+    notes: Good incremental recall
+    
+  - algorithm_id: merchant_slim
+    recall_at_100: 0.19
+    notes: Merchant-level similarity
+    
+  - algorithm_id: nncf_batch
+    recall_at_100: 0.057
+    notes: Collaborative filtering
+    
+  - algorithm_id: llm_cg
+    recall_at_100: 0.009
+    notes: Currently underperforming
+    
+  - algorithm_id: neut
+    recall_at_100: 0.0004
+    notes: Embedding-based, lowest recall
+
+# Attributes schema
+attributes:
+  recall_set_id:
+    type: string
+    description: Unique identifier
+    required: true
+    
+  name:
+    type: string
+    description: Human-readable name
+    required: true
+    
+  description:
+    type: string
+    description: Detailed description
+    required: true
+    
+  recall_level:
+    type: string
+    description: Entity level for recall calculation
+    enum: [product, merchant]
+    required: true
+    
+  k_value:
+    type: integer
+    description: K value for Recall@K
+    required: true
+    
+  metric_name:
+    type: string
+    description: Name of the metric
+    required: true
+    
+  evaluation_type:
+    type: string
+    description: How recall is evaluated
+    enum: [offline, online]
+    required: true
+    
+  positive_event:
+    type: string
+    description: Event type considered as positive
+    enum: [purchase, click, add_to_cart, favorite]
+    required: true
+    
+  data_model:
+    type: string
+    description: BigQuery table containing this metric
+    required: true
+    
+  experiment_integration:
+    type: boolean
+    description: Whether metric is integrated with experiments platform
+    required: false
+    
+  active:
+    type: boolean
+    description: Whether recall set is actively used
+    required: true
+
+# Recall interpretation guide
+interpretation:
+  - metric: recall_at_1
+    description: |
+      Measures if THE top recommendation matches what user purchased.
+      High bar for precision. Useful for "you might like this" scenarios.
+    good_threshold: 0.05
+    excellent_threshold: 0.10
+    
+  - metric: recall_at_2
+    description: |
+      Measures if either of top 2 recommendations matches purchase.
+      Used in experiment dashboards for more granular L3 metrics.
+    good_threshold: 0.08
+    excellent_threshold: 0.15
+    
+  - metric: recall_at_10
+    description: |
+      Measures if any of top 10 recommendations matches purchase.
+      Reflects "first scroll" experience for users.
+    good_threshold: 0.15
+    excellent_threshold: 0.25
+    
+  - metric: recall_at_100
+    description: |
+      Measures if any of top 100 candidates matches purchase.
+      Key metric for evaluating L1 (Candidate Generation) quality.
+      If not in top 100, item cannot be shown to user.
+    good_threshold: 0.25
+    excellent_threshold: 0.40
+
+# NDCG interpretation guide
+ndcg_interpretation:
+  - metric: ndcg_at_10
+    description: |
+      Measures ranking quality in first scroll of recommendations.
+      Key metric for L2 reranker effectiveness.
+    good_threshold: 0.60
+    excellent_threshold: 0.80
+    
+  - metric: ndcg_at_20
+    description: |
+      Measures ranking quality across first two scrolls.
+      Captures early engagement opportunity.
+    good_threshold: 0.55
+    excellent_threshold: 0.75
+    
+  - metric: ndcg_at_100
+    description: |
+      Comprehensive ranking quality across full candidate set.
+      Lower thresholds expected due to sparse relevance.
+    good_threshold: 0.40
+    excellent_threshold: 0.60
+
+# NDCG vs Recall usage guide
+metric_selection_guide:
+  - question: "Are we showing relevant items at all?"
+    use_metric: recall_at_k
+    layer: L1 (Candidate Generation)
+    
+  - question: "Are relevant items ranked at the top?"
+    use_metric: ndcg_at_k
+    layer: L2 (Reranking)
+    
+  - question: "Is our overall system effective?"
+    use_metric: both
+    notes: |
+      High Recall + Low NDCG = Good candidates, poor ranking
+      Low Recall + High NDCG = Poor candidates, good ranking of what we have
+      High Recall + High NDCG = Optimal system performance
+
+# Related data models
+data_models:
+  recall_metrics: sdp-prd-shop-ml.mart.mart__shop_personalization__recs_recall_metrics
+  recall_facts_product: sdp-prd-shop-ml.measures.measures__shop_personalization__recommendation_l3p_recall_facts
+  recall_facts_merchant: sdp-prd-shop-ml.measures.measures__shop_personalization__recommendation_l3m_recall_facts
+
+# Aggregation dimensions
+aggregation_dimensions:
+  - period  # Daily, weekly, monthly
+  - frequency
+  - period_type
+  - app_user_segment_l365d
+  - recommendation_grain
+  - algorithm_type
+  - algorithm_level
+  - is_online
+  - algorithm_id
+
