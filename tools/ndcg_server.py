@@ -1919,20 +1919,23 @@ HTML_TEMPLATE = '''
                         <h3 style="font-size: 0.9rem; color: var(--accent-purple); margin-bottom: 0.75rem;">
                             🔥 Top GMV Opportunities (to reach 0.7 NDCG)
                         </h3>
-                        ${topItems.map((item, idx) => `
+                        ${topItems.map((item, idx) => {
+                            const annual07 = item.gmv_opp_07 * annualFactor;
+                            return `
                             <div class="opportunity-card" style="border-color: var(--accent-purple); background: rgba(168, 85, 247, 0.1);">
                                 <h4 style="color: var(--accent-purple);">#${idx + 1}: ${item.dimension_value}</h4>
                                 <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0.5rem 0;">
                                     Current NDCG: ${item.avg_ndcg.toFixed(3)}. 
-                                    Reaching 0.7 could unlock <strong style="color: var(--accent-purple);">${formatCurrency(item.gmv_opp_07)}</strong> in GMV.
+                                    Reaching 0.7 could unlock <strong style="color: var(--accent-purple);">${formatCurrency(item.gmv_opp_07)}</strong> 
+                                    (<strong style="color: var(--accent-purple);">${formatCurrency(annual07)}/yr</strong>).
                                 </p>
                                 <div class="opportunity-stats">
                                     <span style="background: rgba(59, 130, 246, 0.2); color: var(--accent-blue);">→0.6: ${formatCurrency(item.gmv_opp_06)}</span>
-                                    <span style="background: rgba(168, 85, 247, 0.2); color: var(--accent-purple);">→0.7: ${formatCurrency(item.gmv_opp_07)}</span>
+                                    <span style="background: rgba(168, 85, 247, 0.2); color: var(--accent-purple);">→0.7: ${formatCurrency(item.gmv_opp_07)} (${formatCurrency(annual07)}/yr)</span>
                                     <span style="background: rgba(34, 197, 94, 0.2); color: var(--accent-green);">→0.8: ${formatCurrency(item.gmv_opp_08)}</span>
                                 </div>
                             </div>
-                        `).join('')}
+                        `}).join('')}
                     `;
                     topOpps.style.display = 'block';
                 }
