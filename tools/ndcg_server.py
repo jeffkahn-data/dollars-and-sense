@@ -1078,7 +1078,8 @@ HTML_TEMPLATE = '''
                 <div class="optimization-header">
                     <h2>🎯 Performance Optimization</h2>
                     <div class="dimension-selector">
-                        <button class="dimension-btn active" onclick="loadOptimization('surface')">By Surface</button>
+                        <button class="dimension-btn" onclick="loadOptimization('surface')">By Surface</button>
+                        <button class="dimension-btn active" onclick="loadOptimization('module')">By Module</button>
                         <button class="dimension-btn" onclick="loadOptimization('segment')">By Segment</button>
                         <button class="dimension-btn" onclick="loadOptimization('category')">By Category</button>
                     </div>
@@ -1151,7 +1152,8 @@ HTML_TEMPLATE = '''
                 <div class="optimization-header">
                     <h2>💰 GMV Opportunity Analysis</h2>
                     <div class="dimension-selector">
-                        <button class="dimension-btn active" onclick="loadGmvOpportunity('surface')">By Surface</button>
+                        <button class="dimension-btn" onclick="loadGmvOpportunity('surface')">By Surface</button>
+                        <button class="dimension-btn active" onclick="loadGmvOpportunity('module')">By Module</button>
                         <button class="dimension-btn" onclick="loadGmvOpportunity('segment')">By Segment</button>
                         <button class="dimension-btn" onclick="loadGmvOpportunity('category')">By Category</button>
                         <button class="dimension-btn" onclick="loadGmvOpportunity('country')">By Country</button>
@@ -2325,11 +2327,13 @@ def api_optimization():
     # Map dimension to BigQuery column
     dim_column_map = {
         'surface': 'imp.surface',
+        'module': 'imp.section_id',
         'segment': 'CASE WHEN imp.user_id > 0 THEN "returning" ELSE "anonymous" END',
         'category': 'COALESCE(p.category, "Uncategorized")'
     }
     
-    dim_column = dim_column_map.get(dimension, 'imp.surface')
+    dim_column = dim_column_map.get(dimension, 'imp.section_id')
+    needs_product_join = dimension == 'category'
     
     query = f"""
     WITH impressions AS (
@@ -2512,12 +2516,13 @@ def api_gmv_opportunity():
     # Map dimension to columns
     dim_column_map = {
         'surface': 'imp.surface',
+        'module': 'imp.section_id',
         'segment': 'CASE WHEN imp.user_id > 0 THEN "Returning" ELSE "Anonymous" END',
         'category': 'COALESCE(p.category, "Uncategorized")',
         'country': 'COALESCE(ud.last.geo.country, "Unknown")'
     }
     
-    dim_column = dim_column_map.get(dimension, 'imp.surface')
+    dim_column = dim_column_map.get(dimension, 'imp.section_id')
     needs_product_join = dimension == 'category'
     needs_user_join = dimension == 'country'
     
