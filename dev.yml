@@ -1,0 +1,11 @@
+name: dollars-and-sense
+
+up:
+  - python: 3.11
+  - pip:
+      requirements: tools/requirements.txt
+
+commands:
+  server: python tools/ndcg_server.py --port 8080
+  test: echo "No tests configured yet"
+
