@@ -986,6 +986,7 @@ HTML_TEMPLATE = '''
             <div class="tab active" onclick="switchTab('explorer')">🔍 Explorer</div>
             <div class="tab" onclick="switchTab('optimization')">📊 Optimization</div>
             <div class="tab" onclick="switchTab('gmv')">💰 GMV Opportunity</div>
+            <div class="tab" onclick="switchTab('trends')">📈 Trends</div>
         </div>
         
         <!-- Explorer Tab Content -->
@@ -1214,11 +1215,75 @@ HTML_TEMPLATE = '''
             </div>
         </div><!-- End GMV Tab -->
         
+        <!-- Trends Tab Content -->
+        <div id="trends-tab" class="tab-content">
+            <div class="optimization-panel">
+                <div class="optimization-header">
+                    <h2>📈 Time-Series Trends</h2>
+                    <div class="dimension-selector">
+                        <select id="trends-surface" style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 6px;">
+                            <option value="all">All Surfaces</option>
+                            <option value="super_feed">super_feed</option>
+                        </select>
+                    </div>
+                    <div class="filter-group" style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="color: var(--text-secondary);">Days Back</span>
+                        <input type="number" id="trends-days" value="30" min="7" max="90" style="width: 80px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 6px;">
+                    </div>
+                    <button class="dimension-btn active" onclick="loadTrends()">🔄 Refresh</button>
+                </div>
+                
+                <div id="trends-loading" class="loading" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>Loading trend data...</p>
+                </div>
+                
+                <div id="trends-charts" style="display: none;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="metric-summary-card" style="background: var(--bg-card); padding: 1rem; border-radius: 10px; border: 1px solid var(--border-color);">
+                            <h3 style="color: var(--accent-green); margin-bottom: 0.75rem; font-size: 0.9rem;">📊 NDCG Over Time</h3>
+                            <canvas id="ndcg-chart" height="200"></canvas>
+                        </div>
+                        <div class="metric-summary-card" style="background: var(--bg-card); padding: 1rem; border-radius: 10px; border: 1px solid var(--border-color);">
+                            <h3 style="color: var(--accent-blue); margin-bottom: 0.75rem; font-size: 0.9rem;">📍 CTR & PTR Over Time</h3>
+                            <canvas id="ctr-chart" height="200"></canvas>
+                        </div>
+                    </div>
+                    <div class="metric-summary-card" style="background: var(--bg-card); padding: 1rem; border-radius: 10px; border: 1px solid var(--border-color);">
+                        <h3 style="color: var(--accent-purple); margin-bottom: 0.75rem; font-size: 0.9rem;">📦 Sessions & Impressions</h3>
+                        <canvas id="volume-chart" height="150"></canvas>
+                    </div>
+                </div>
+                
+                <div id="trends-summary" style="display: none; margin-top: 1rem;">
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
+                        <div class="metric-summary-card" style="background: var(--bg-card); padding: 1rem; border-radius: 10px; border: 1px solid var(--border-color); text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--accent-green);" id="trend-ndcg-change">--</div>
+                            <div style="font-size: 0.8rem; color: var(--text-secondary);">NDCG Trend</div>
+                        </div>
+                        <div class="metric-summary-card" style="background: var(--bg-card); padding: 1rem; border-radius: 10px; border: 1px solid var(--border-color); text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--accent-blue);" id="trend-ctr-change">--</div>
+                            <div style="font-size: 0.8rem; color: var(--text-secondary);">CTR Trend</div>
+                        </div>
+                        <div class="metric-summary-card" style="background: var(--bg-card); padding: 1rem; border-radius: 10px; border: 1px solid var(--border-color); text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: 700;" id="trend-avg-ndcg">--</div>
+                            <div style="font-size: 0.8rem; color: var(--text-secondary);">Avg NDCG</div>
+                        </div>
+                        <div class="metric-summary-card" style="background: var(--bg-card); padding: 1rem; border-radius: 10px; border: 1px solid var(--border-color); text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: 700;" id="trend-avg-ctr">--</div>
+                            <div style="font-size: 0.8rem; color: var(--text-secondary);">Avg CTR</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div><!-- End Trends Tab -->
+        
         <footer>
             <p>Powered by <a href="#">Dollars & Sense</a> | Querying live BigQuery data</p>
         </footer>
     </div>
     
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script>
         // Load filter options on page load
         async function loadFilterOptions() {
@@ -1643,7 +1708,8 @@ HTML_TEMPLATE = '''
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             
-            const tabIndex = tabName === 'explorer' ? 1 : tabName === 'optimization' ? 2 : 3;
+            const tabMap = { 'explorer': 1, 'optimization': 2, 'gmv': 3, 'trends': 4 };
+            const tabIndex = tabMap[tabName] || 1;
             document.querySelector(`.tab:nth-child(${tabIndex})`).classList.add('active');
             document.getElementById(`${tabName}-tab`).classList.add('active');
             
@@ -1651,6 +1717,8 @@ HTML_TEMPLATE = '''
                 loadOptimization();
             } else if (tabName === 'gmv') {
                 loadGmvOpportunity();
+            } else if (tabName === 'trends') {
+                loadTrends();
             }
         }
         
@@ -1873,6 +1941,168 @@ HTML_TEMPLATE = '''
                 
             } catch (e) {
                 loading.innerHTML = `<span>Error loading GMV data: ${e.message}</span>`;
+            }
+        }
+        
+        // Trends functions
+        let ndcgChart = null;
+        let ctrChart = null;
+        let volumeChart = null;
+        
+        async function loadTrends() {
+            const loading = document.getElementById('trends-loading');
+            const charts = document.getElementById('trends-charts');
+            const summary = document.getElementById('trends-summary');
+            const daysBack = document.getElementById('trends-days').value;
+            const surface = document.getElementById('trends-surface').value;
+            
+            loading.style.display = 'block';
+            charts.style.display = 'none';
+            summary.style.display = 'none';
+            
+            try {
+                const response = await fetch(`/api/trends?days_back=${daysBack}&surface=${surface}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    loading.innerHTML = `<span>Error: ${data.error}</span>`;
+                    return;
+                }
+                
+                if (data.data.length === 0) {
+                    loading.innerHTML = '<span>No trend data available</span>';
+                    return;
+                }
+                
+                const labels = data.data.map(d => d.date);
+                const ndcgData = data.data.map(d => d.ndcg);
+                const ctrData = data.data.map(d => d.ctr);
+                const ptrData = data.data.map(d => d.ptr * 10); // Scale PTR for visibility
+                const sessionsData = data.data.map(d => d.sessions / 1000000);
+                const impressionsData = data.data.map(d => d.impressions / 1000000);
+                
+                // Destroy existing charts
+                if (ndcgChart) ndcgChart.destroy();
+                if (ctrChart) ctrChart.destroy();
+                if (volumeChart) volumeChart.destroy();
+                
+                const chartOptions = {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: true, labels: { color: '#8888a0' } }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#8888a0', maxRotation: 45 }, grid: { color: '#2a2a3a' } },
+                        y: { ticks: { color: '#8888a0' }, grid: { color: '#2a2a3a' } }
+                    }
+                };
+                
+                // NDCG Chart
+                ndcgChart = new Chart(document.getElementById('ndcg-chart'), {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'NDCG',
+                            data: ndcgData,
+                            borderColor: '#22c55e',
+                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            fill: true,
+                            tension: 0.3
+                        }]
+                    },
+                    options: { ...chartOptions, scales: { ...chartOptions.scales, y: { ...chartOptions.scales.y, min: 0, max: 1 } } }
+                });
+                
+                // CTR/PTR Chart
+                ctrChart = new Chart(document.getElementById('ctr-chart'), {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'CTR (%)',
+                                data: ctrData,
+                                borderColor: '#3b82f6',
+                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                fill: false,
+                                tension: 0.3
+                            },
+                            {
+                                label: 'PTR (×10 for scale)',
+                                data: ptrData,
+                                borderColor: '#a855f7',
+                                backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                                fill: false,
+                                tension: 0.3
+                            }
+                        ]
+                    },
+                    options: chartOptions
+                });
+                
+                // Volume Chart
+                volumeChart = new Chart(document.getElementById('volume-chart'), {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Sessions (M)',
+                                data: sessionsData,
+                                backgroundColor: 'rgba(168, 85, 247, 0.6)',
+                                yAxisID: 'y'
+                            },
+                            {
+                                label: 'Impressions (M)',
+                                data: impressionsData,
+                                backgroundColor: 'rgba(59, 130, 246, 0.4)',
+                                yAxisID: 'y1'
+                            }
+                        ]
+                    },
+                    options: {
+                        ...chartOptions,
+                        scales: {
+                            x: { ticks: { color: '#8888a0', maxRotation: 45 }, grid: { color: '#2a2a3a' } },
+                            y: { type: 'linear', position: 'left', ticks: { color: '#a855f7' }, grid: { color: '#2a2a3a' } },
+                            y1: { type: 'linear', position: 'right', ticks: { color: '#3b82f6' }, grid: { display: false } }
+                        }
+                    }
+                });
+                
+                // Calculate trends (first week vs last week)
+                const firstWeek = data.data.slice(0, 7);
+                const lastWeek = data.data.slice(-7);
+                
+                const avgNdcgFirst = firstWeek.reduce((s, d) => s + d.ndcg, 0) / firstWeek.length;
+                const avgNdcgLast = lastWeek.reduce((s, d) => s + d.ndcg, 0) / lastWeek.length;
+                const ndcgChange = ((avgNdcgLast - avgNdcgFirst) / avgNdcgFirst * 100);
+                
+                const avgCtrFirst = firstWeek.reduce((s, d) => s + d.ctr, 0) / firstWeek.length;
+                const avgCtrLast = lastWeek.reduce((s, d) => s + d.ctr, 0) / lastWeek.length;
+                const ctrChange = ((avgCtrLast - avgCtrFirst) / avgCtrFirst * 100);
+                
+                const overallNdcg = data.data.reduce((s, d) => s + d.ndcg, 0) / data.data.length;
+                const overallCtr = data.data.reduce((s, d) => s + d.ctr, 0) / data.data.length;
+                
+                // Update summary
+                document.getElementById('trend-ndcg-change').textContent = (ndcgChange >= 0 ? '+' : '') + ndcgChange.toFixed(1) + '%';
+                document.getElementById('trend-ndcg-change').style.color = ndcgChange >= 0 ? '#22c55e' : '#ef4444';
+                
+                document.getElementById('trend-ctr-change').textContent = (ctrChange >= 0 ? '+' : '') + ctrChange.toFixed(1) + '%';
+                document.getElementById('trend-ctr-change').style.color = ctrChange >= 0 ? '#22c55e' : '#ef4444';
+                
+                document.getElementById('trend-avg-ndcg').textContent = overallNdcg.toFixed(3);
+                document.getElementById('trend-avg-ctr').textContent = overallCtr.toFixed(2) + '%';
+                
+                loading.style.display = 'none';
+                charts.style.display = 'block';
+                summary.style.display = 'block';
+                
+            } catch (e) {
+                loading.innerHTML = `<span>Error loading trends: ${e.message}</span>`;
             }
         }
         
@@ -2432,6 +2662,111 @@ def api_gmv_opportunity():
     except Exception as e:
         print(f"GMV opportunity query error: {e}")
         return jsonify({'error': str(e), 'items': [], 'overall': {}, 'total_opportunity': 0})
+
+
+@app.route('/api/trends')
+def api_trends():
+    """Return time-series metrics data for trend analysis."""
+    days_back = int(request.args.get('days_back', 30))
+    surface = request.args.get('surface', 'all')
+    
+    client = get_bq_client()
+    
+    # Build surface filter
+    surface_filter = ""
+    if surface and surface != 'all':
+        surface_filter = f"AND surface = '{surface}'"
+    
+    query = f"""
+    WITH daily_impressions AS (
+      SELECT
+        DATE(event_timestamp) AS event_date,
+        session_id,
+        section_y_pos AS position,
+        is_clicked,
+        has_1d_any_touch_attr_order AS has_purchase,
+        CASE 
+          WHEN has_1d_any_touch_attr_order THEN 4
+          WHEN is_clicked THEN 2
+          ELSE 0
+        END AS relevance
+      FROM `sdp-prd-shop-ml.product_recommendation.intermediate__shop_personalization__recs_impressions_enriched`
+      WHERE DATE(event_timestamp) >= DATE_SUB(CURRENT_DATE(), INTERVAL {days_back} DAY)
+        AND DATE(event_timestamp) < CURRENT_DATE()
+        AND section_y_pos > 0
+        AND section_y_pos <= 20
+        AND entity_type = 'product'
+        AND entity_is_unified_rec
+        {surface_filter}
+    ),
+    
+    -- Compute ideal ranks for IDCG
+    impressions_ranked AS (
+      SELECT
+        *,
+        ROW_NUMBER() OVER (PARTITION BY event_date, session_id ORDER BY relevance DESC, position ASC) AS ideal_rank
+      FROM daily_impressions
+    ),
+    
+    -- Session-level metrics
+    session_metrics AS (
+      SELECT
+        event_date,
+        session_id,
+        COUNT(*) AS impressions,
+        SUM(CASE WHEN is_clicked THEN 1 ELSE 0 END) AS clicks,
+        SUM(CASE WHEN has_purchase THEN 1 ELSE 0 END) AS purchases,
+        SUM(relevance / LOG(position + 1, 2)) AS dcg,
+        SUM(relevance / LOG(ideal_rank + 1, 2)) AS idcg
+      FROM impressions_ranked
+      GROUP BY event_date, session_id
+    ),
+    
+    -- Daily aggregates
+    daily_metrics AS (
+      SELECT
+        event_date,
+        COUNT(DISTINCT session_id) AS sessions,
+        SUM(impressions) AS total_impressions,
+        SUM(clicks) AS total_clicks,
+        SUM(purchases) AS total_purchases,
+        SAFE_DIVIDE(SUM(clicks), SUM(impressions)) * 100 AS ctr,
+        SAFE_DIVIDE(SUM(purchases), SUM(impressions)) * 100 AS ptr,
+        AVG(SAFE_DIVIDE(dcg, NULLIF(idcg, 0))) AS avg_ndcg
+      FROM session_metrics
+      GROUP BY event_date
+    )
+    
+    SELECT * FROM daily_metrics
+    ORDER BY event_date ASC
+    """
+    
+    try:
+        results = client.query(query).to_dataframe()
+        
+        # Convert to list of dicts for JSON
+        data = []
+        for _, row in results.iterrows():
+            data.append({
+                'date': row['event_date'].strftime('%Y-%m-%d'),
+                'sessions': int(row['sessions']) if row['sessions'] else 0,
+                'impressions': int(row['total_impressions']) if row['total_impressions'] else 0,
+                'clicks': int(row['total_clicks']) if row['total_clicks'] else 0,
+                'purchases': int(row['total_purchases']) if row['total_purchases'] else 0,
+                'ctr': safe_float(row['ctr'], 0),
+                'ptr': safe_float(row['ptr'], 0),
+                'ndcg': safe_float(row['avg_ndcg'], 0),
+            })
+        
+        return jsonify({
+            'days_back': days_back,
+            'surface': surface,
+            'data': data
+        })
+        
+    except Exception as e:
+        print(f"Trends query error: {e}")
+        return jsonify({'error': str(e), 'data': []})
 
 
 @app.route('/api/sessions')
