@@ -1974,9 +1974,9 @@ HTML_TEMPLATE = '''
                                     (<strong style="color: var(--accent-purple);">${formatCurrency(annual07)}/yr</strong>).
                                 </p>
                                 <div class="opportunity-stats">
-                                    <span style="background: rgba(59, 130, 246, 0.2); color: var(--accent-blue);">→0.6: ${formatCurrency(item.gmv_opp_06)}</span>
-                                    <span style="background: rgba(168, 85, 247, 0.2); color: var(--accent-purple);">→0.7: ${formatCurrency(item.gmv_opp_07)} (${formatCurrency(annual07)}/yr)</span>
-                                    <span style="background: rgba(34, 197, 94, 0.2); color: var(--accent-green);">→0.8: ${formatCurrency(item.gmv_opp_08)}</span>
+                                    <span style="background: rgba(59, 130, 246, 0.2); color: var(--accent-blue);">→0.6: ${formatCurrency(item.gmv_opp_06)} (+${formatCurrency(item.gmv_opp_06 * annualFactor)}/yr)</span>
+                                    <span style="background: rgba(168, 85, 247, 0.2); color: var(--accent-purple);">→0.7: ${formatCurrency(item.gmv_opp_07)} (+${formatCurrency(annual07)}/yr)</span>
+                                    <span style="background: rgba(34, 197, 94, 0.2); color: var(--accent-green);">→0.8: ${formatCurrency(item.gmv_opp_08)} (+${formatCurrency(item.gmv_opp_08 * annualFactor)}/yr)</span>
                                 </div>
                             </div>
                         `}).join('')}
@@ -2007,13 +2007,13 @@ HTML_TEMPLATE = '''
                             <td class="metric-value">${(item.sessions / 1000000).toFixed(2)}M</td>
                             <td class="metric-value">${item.avg_ndcg.toFixed(3)}</td>
                             <td class="metric-value" style="${hasOpp06 ? 'color: var(--accent-blue); font-weight: 600;' : 'color: var(--text-secondary);'}">
-                                ${hasOpp06 ? '+' + formatCurrency(item.gmv_opp_06) + '<br><span style="font-size: 0.75em; opacity: 0.8;">(' + formatCurrency(item.gmv_opp_06 * annualFactor) + '/yr)</span>' : '--'}
+                                ${hasOpp06 ? '+' + formatCurrency(item.gmv_opp_06) + '<br><span style="font-size: 0.75em; opacity: 0.8;">(+' + formatCurrency(item.gmv_opp_06 * annualFactor) + '/yr)</span>' : '--'}
                             </td>
                             <td class="metric-value" style="${hasOpp07 ? 'color: var(--accent-purple); font-weight: 600;' : 'color: var(--text-secondary);'}">
-                                ${hasOpp07 ? '+' + formatCurrency(item.gmv_opp_07) + '<br><span style="font-size: 0.75em; opacity: 0.8;">(' + formatCurrency(item.gmv_opp_07 * annualFactor) + '/yr)</span>' : '--'}
+                                ${hasOpp07 ? '+' + formatCurrency(item.gmv_opp_07) + '<br><span style="font-size: 0.75em; opacity: 0.8;">(+' + formatCurrency(item.gmv_opp_07 * annualFactor) + '/yr)</span>' : '--'}
                             </td>
                             <td class="metric-value" style="${hasOpp08 ? 'color: var(--accent-green); font-weight: 600;' : 'color: var(--text-secondary);'}">
-                                ${hasOpp08 ? '+' + formatCurrency(item.gmv_opp_08) + '<br><span style="font-size: 0.75em; opacity: 0.8;">(' + formatCurrency(item.gmv_opp_08 * annualFactor) + '/yr)</span>' : '--'}
+                                ${hasOpp08 ? '+' + formatCurrency(item.gmv_opp_08) + '<br><span style="font-size: 0.75em; opacity: 0.8;">(+' + formatCurrency(item.gmv_opp_08 * annualFactor) + '/yr)</span>' : '--'}
                             </td>
                             <td class="metric-value" style="${hasOpp07 ? 'color: var(--accent-purple); font-weight: 700; background: rgba(168, 85, 247, 0.1);' : 'color: var(--text-secondary);'}">
                                 ${hasOpp07 ? '+' + formatCurrency(annualOpp07) : '--'}
