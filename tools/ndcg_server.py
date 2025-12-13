@@ -1078,7 +1078,7 @@ HTML_TEMPLATE = '''
                 <div class="optimization-header">
                     <h2>🎯 Performance Optimization</h2>
                     <div class="dimension-selector">
-                        <button class="dimension-btn" onclick="loadOptimization('surface')">By Surface</button>
+                        <button class="dimension-btn" onclick="loadOptimization('surface')">Overall</button>
                         <button class="dimension-btn active" onclick="loadOptimization('module')">By Module</button>
                         <button class="dimension-btn" onclick="loadOptimization('segment')">By Segment</button>
                         <button class="dimension-btn" onclick="loadOptimization('category')">By Category</button>
@@ -1152,7 +1152,7 @@ HTML_TEMPLATE = '''
                 <div class="optimization-header">
                     <h2>💰 GMV Opportunity Analysis</h2>
                     <div class="dimension-selector">
-                        <button class="dimension-btn" onclick="loadGmvOpportunity('surface')">By Surface</button>
+                        <button class="dimension-btn" onclick="loadGmvOpportunity('surface')">Overall</button>
                         <button class="dimension-btn active" onclick="loadGmvOpportunity('module')">By Module</button>
                         <button class="dimension-btn" onclick="loadGmvOpportunity('segment')">By Segment</button>
                         <button class="dimension-btn" onclick="loadGmvOpportunity('category')">By Category</button>
