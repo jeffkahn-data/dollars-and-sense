@@ -1746,27 +1746,45 @@ HTML_TEMPLATE = '''
         
         // Optimization functions
         let currentDimension = 'module';
+        let optAbortController = null;  // Track pending optimization request
         
         async function loadOptimization(dimension) {
-            if (dimension) {
-                currentDimension = dimension;
-                document.querySelectorAll('.dimension-btn').forEach(b => b.classList.remove('active'));
-                event.target.classList.add('active');
+            // Cancel any pending request to prevent race conditions
+            if (optAbortController) {
+                optAbortController.abort();
             }
+            optAbortController = new AbortController();
             
+            // FIRST: Clear everything immediately to prevent stale data
             const loading = document.getElementById('optimization-loading');
             const table = document.getElementById('optimization-table');
             const tbody = document.getElementById('optimization-tbody');
             const opps = document.getElementById('opportunities-container');
             
+            tbody.innerHTML = '';  // Clear table first
+            opps.innerHTML = '';
             loading.style.display = 'flex';
             table.style.display = 'none';
-            opps.innerHTML = '';
+            
+            if (dimension) {
+                currentDimension = dimension;
+                // Update button states for Optimization tab
+                document.querySelectorAll('#optimization-tab .dimension-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('#optimization-tab .dimension-btn').forEach(b => {
+                    if (b.textContent.toLowerCase().includes(dimension.replace('_', ' ')) || 
+                        (dimension === 'surface' && b.textContent.includes('Overall')) ||
+                        (dimension === 'position' && b.textContent.includes('Position'))) {
+                        b.classList.add('active');
+                    }
+                });
+            }
             
             const daysBack = document.getElementById('opt-days-back').value;
             
             try {
-                const response = await fetch(`/api/optimization?dimension=${currentDimension}&days_back=${daysBack}`);
+                const response = await fetch(`/api/optimization?dimension=${currentDimension}&days_back=${daysBack}`, {
+                    signal: optAbortController.signal
+                });
                 const data = await response.json();
                 
                 if (data.error) {
@@ -1854,12 +1872,15 @@ HTML_TEMPLATE = '''
                 table.style.display = 'table';
                 
             } catch (e) {
+                // Ignore abort errors (user clicked another dimension)
+                if (e.name === 'AbortError') return;
                 loading.innerHTML = `<span>Error loading optimization data: ${e.message}</span>`;
             }
         }
         
         // GMV Opportunity functions
         let gmvDimension = 'module';
+        let gmvAbortController = null;  // Track pending GMV request
         
         function formatCurrency(amount) {
             if (amount >= 1000000000) {
@@ -1873,27 +1894,44 @@ HTML_TEMPLATE = '''
         }
         
         async function loadGmvOpportunity(dimension) {
-            if (dimension) {
-                gmvDimension = dimension;
-                // Update button states for GMV tab
-                document.querySelectorAll('#gmv-tab .dimension-btn').forEach(b => b.classList.remove('active'));
-                event.target.classList.add('active');
+            // Cancel any pending request to prevent race conditions
+            if (gmvAbortController) {
+                gmvAbortController.abort();
             }
+            gmvAbortController = new AbortController();
+            const currentRequestDimension = dimension || gmvDimension;
             
+            // FIRST: Clear the table immediately to prevent stale data
             const loading = document.getElementById('gmv-loading');
             const table = document.getElementById('gmv-table');
             const tbody = document.getElementById('gmv-tbody');
             const topOpps = document.getElementById('gmv-top-opportunities');
             
+            tbody.innerHTML = '';  // Clear table first
             loading.style.display = 'flex';
             table.style.display = 'none';
             topOpps.style.display = 'none';
-            tbody.innerHTML = '';
+            
+            if (dimension) {
+                gmvDimension = dimension;
+                // Update button states for GMV tab
+                document.querySelectorAll('#gmv-tab .dimension-btn').forEach(b => b.classList.remove('active'));
+                // Find and activate the clicked button by matching the dimension
+                document.querySelectorAll('#gmv-tab .dimension-btn').forEach(b => {
+                    if (b.textContent.toLowerCase().includes(dimension.replace('_', ' ')) || 
+                        (dimension === 'surface' && b.textContent.includes('Overall')) ||
+                        (dimension === 'position' && b.textContent.includes('Position'))) {
+                        b.classList.add('active');
+                    }
+                });
+            }
             
             const daysBack = document.getElementById('gmv-days-back').value;
             
             try {
-                const response = await fetch(`/api/gmv_opportunity?dimension=${gmvDimension}&days_back=${daysBack}`);
+                const response = await fetch(`/api/gmv_opportunity?dimension=${gmvDimension}&days_back=${daysBack}`, {
+                    signal: gmvAbortController.signal
+                });
                 const data = await response.json();
                 
                 if (data.error) {
@@ -1989,6 +2027,8 @@ HTML_TEMPLATE = '''
                 table.style.display = 'table';
                 
             } catch (e) {
+                // Ignore abort errors (user clicked another dimension)
+                if (e.name === 'AbortError') return;
                 loading.innerHTML = `<span>Error loading GMV data: ${e.message}</span>`;
             }
         }
