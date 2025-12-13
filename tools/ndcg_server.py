@@ -82,7 +82,7 @@ def query_sessions(
         "imp.section_y_pos > 0",
         "imp.section_y_pos <= 10",
         "imp.entity_type = 'product'",
-        "imp.entity_is_unified_rec",
+        "imp.section_id IN ('products_from_merchant_discovery_recs', 'minis_shoppable_video', 'merchant_rec_with_deals')",
     ]
     
     if surface and surface != 'all':
@@ -108,7 +108,7 @@ def query_sessions(
         AND imp.section_y_pos > 0
         AND imp.section_y_pos <= 10
         AND imp.entity_type = 'product'
-        AND imp.entity_is_unified_rec
+        AND imp.section_id IN ('products_from_merchant_discovery_recs', 'minis_shoppable_video', 'merchant_rec_with_deals')
         {"AND imp.has_1d_any_touch_attr_order = true" if require_purchase else "AND (imp.is_clicked OR imp.has_1d_any_touch_attr_order)"}
         {country_filter}
       LIMIT 100
@@ -254,7 +254,7 @@ def get_filter_options():
       ON CAST(imp.entity_id AS INT64) = p.product_id
     WHERE DATE(imp.event_timestamp) >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 DAY)
       AND imp.entity_type = 'product'
-      AND imp.entity_is_unified_rec
+      AND imp.section_id IN ('products_from_merchant_discovery_recs', 'minis_shoppable_video', 'merchant_rec_with_deals')
     LIMIT 1000
     """
     
@@ -2181,7 +2181,7 @@ def api_metrics():
         "imp.section_y_pos > 0",
         "imp.section_y_pos <= 20",
         "imp.entity_type = 'product'",
-        "imp.entity_is_unified_rec",
+        "imp.section_id IN ('products_from_merchant_discovery_recs', 'minis_shoppable_video', 'merchant_rec_with_deals')",
     ]
     
     if surface and surface != 'all':
@@ -2354,7 +2354,7 @@ def api_optimization():
         AND imp.section_y_pos > 0
         AND imp.section_y_pos <= 20
         AND imp.entity_type = 'product'
-        AND imp.entity_is_unified_rec
+        AND imp.section_id IN ('products_from_merchant_discovery_recs', 'minis_shoppable_video', 'merchant_rec_with_deals')
     ),
     
     -- Compute ideal ranks for IDCG
@@ -2550,7 +2550,7 @@ def api_gmv_opportunity():
         AND imp.section_y_pos > 0
         AND imp.section_y_pos <= 20
         AND imp.entity_type = 'product'
-        AND imp.entity_is_unified_rec
+        AND imp.section_id IN ('products_from_merchant_discovery_recs', 'minis_shoppable_video', 'merchant_rec_with_deals')
     ),
     
     -- Get GMV for attributed orders
@@ -2767,7 +2767,7 @@ def api_trends():
         AND section_y_pos > 0
         AND section_y_pos <= 20
         AND entity_type = 'product'
-        AND entity_is_unified_rec
+        AND section_id IN ('products_from_merchant_discovery_recs', 'minis_shoppable_video', 'merchant_rec_with_deals')
         {surface_filter}
     ),
     
