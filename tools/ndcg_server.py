@@ -1082,7 +1082,6 @@ HTML_TEMPLATE = '''
                         <button class="dimension-btn active" onclick="loadOptimization('module')">By Module</button>
                         <button class="dimension-btn" onclick="loadOptimization('reranker')">By Reranker</button>
                         <button class="dimension-btn" onclick="loadOptimization('cg_source')">By CG Source</button>
-                        <button class="dimension-btn" onclick="loadOptimization('segment')">By Segment</button>
                         <button class="dimension-btn" onclick="loadOptimization('category')">By Category</button>
                     </div>
                     <div class="filter-group">
@@ -1158,7 +1157,6 @@ HTML_TEMPLATE = '''
                         <button class="dimension-btn active" onclick="loadGmvOpportunity('module')">By Module</button>
                         <button class="dimension-btn" onclick="loadGmvOpportunity('reranker')">By Reranker</button>
                         <button class="dimension-btn" onclick="loadGmvOpportunity('cg_source')">By CG Source</button>
-                        <button class="dimension-btn" onclick="loadGmvOpportunity('segment')">By Segment</button>
                         <button class="dimension-btn" onclick="loadGmvOpportunity('category')">By Category</button>
                         <button class="dimension-btn" onclick="loadGmvOpportunity('country')">By Country</button>
                     </div>

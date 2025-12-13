@@ -529,3 +529,148 @@ performance_benchmarks:
     ctr: 0.005
     cvr: 0.00001
 
+# ============================================
+# Live Algorithm IDs from BigQuery (Dec 2024)
+# ============================================
+# These are the exact algorithm_id values found in 
+# intermediate__shop_personalization__recs_impressions_enriched
+
+live_reranker_algorithms:
+  # Primary reranking algorithms (algorithm_id column)
+  - algorithm_id: streaming__default-hard-decay__xgb_product_ranking_v0_w_cmpg_ftrs
+    name: XGBoost Reranker with Campaign Features (Hard Decay)
+    layer: L2
+    gmv_7d: 845000  # $845K
+    sessions_7d: 9830000  # 9.83M
+    ndcg: 0.541
+    ctr: 0.0070  # 0.70%
+    notes: Main production reranker with impression decay
+    
+  - algorithm_id: streaming__buyer-recs-v0__xgb_product_ranking_v0_homefeed_er
+    name: XGBoost Buyer Recs Reranker
+    layer: L2
+    gmv_7d: 747200  # $747.2K
+    sessions_7d: 17390000  # 17.39M
+    ndcg: 0.550
+    ctr: 0.0065  # 0.65%
+    notes: Personalized buyer-specific reranking
+    
+  - algorithm_id: best_sellers
+    name: Best Sellers (Fallback/Padding)
+    layer: L2
+    gmv_7d: 47400  # $47.4K
+    sessions_7d: 12600000  # 12.6M
+    ndcg: 0.585
+    ctr: 0.0021  # 0.21%
+    notes: Used for cold-start and padding
+    
+  - algorithm_id: streaming__default-diverse-v1__xgb_product_ranking_v0_w_cmpg_ftrs
+    name: XGBoost Diverse Reranker
+    layer: L2
+    gmv_7d: 319  # $319
+    sessions_7d: 10000  # 10K
+    ndcg: 0.692
+    ctr: 0.0031  # 0.31%
+    notes: Experimental - optimizes for diversity
+    
+  - algorithm_id: streaming__default-hstu-v5-boosting__xgb_product_ranking_v0_w_cmpg_ftrs
+    name: XGBoost with HSTU Boosting
+    layer: L2
+    gmv_7d: 65  # $65
+    sessions_7d: 10000  # 10K
+    ndcg: 0.702
+    ctr: 0.0034  # 0.34%
+    notes: Experimental - boosts HSTU candidates
+    
+  - algorithm_id: streaming__default-thompson-sampling-decay__xgb_product_ranking_v0_w_cmpg_ftrs
+    name: XGBoost with Thompson Sampling Decay
+    layer: L2
+    gmv_7d: 0
+    sessions_7d: 1000
+    ndcg: 0.699
+    ctr: 0.0041  # 0.41%
+    notes: Experimental - probabilistic decay
+
+live_cg_algorithms:
+  # Candidate Generation sources (cg_sources.cg_algorithm_name column)
+  - cg_algorithm_name: hstu
+    name: HSTU Candidate Generation
+    layer: L1
+    gmv_7d: 493900  # $493.9K
+    sessions_7d: 4190000  # 4.19M
+    ndcg: 0.781
+    ctr: 0.0099  # 0.99%
+    notes: Best NDCG among batch CG sources
+    
+  - cg_algorithm_name: recent_interactions
+    name: Recent Interactions
+    layer: L1
+    gmv_7d: 402600  # $402.6K
+    sessions_7d: 2360000  # 2.36M
+    ndcg: 0.874
+    ctr: 0.0214  # 2.14%
+    notes: Highest NDCG - session-based personalization
+    
+  - cg_algorithm_name: product_slim
+    name: Product SLIM
+    layer: L1
+    gmv_7d: 244200  # $244.2K
+    sessions_7d: 4560000  # 4.56M
+    ndcg: 0.622
+    ctr: 0.0075  # 0.75%
+    notes: Collaborative filtering on product interactions
+    
+  - cg_algorithm_name: top_slim_products_gender_coef
+    name: SLIM with Gender Coefficients
+    layer: L1
+    gmv_7d: 207400  # $207.4K
+    sessions_7d: 4930000  # 4.93M
+    ndcg: 0.698
+    ctr: 0.0066  # 0.66%
+    notes: Gender-aware SLIM recommendations
+    
+  - cg_algorithm_name: recently_viewed
+    name: Recently Viewed Products
+    layer: L1
+    gmv_7d: 144700  # $144.7K
+    sessions_7d: 470000  # 0.47M
+    ndcg: 0.869
+    ctr: 0.0279  # 2.79%
+    notes: Highest CTR - recency-based
+    
+  - cg_algorithm_name: product_nncf
+    name: Product NNCF
+    layer: L1
+    gmv_7d: 115700  # $115.7K
+    sessions_7d: 2880000  # 2.88M
+    ndcg: 0.630
+    ctr: 0.0077  # 0.77%
+    notes: Neural collaborative filtering
+    
+  - cg_algorithm_name: padding_products
+    name: Padding Products
+    layer: L1
+    gmv_7d: 62300  # $62.3K
+    sessions_7d: 4770000  # 4.77M
+    ndcg: 0.530
+    ctr: 0.0042  # 0.42%
+    notes: Fallback - lowest NDCG, optimization opportunity
+    
+  - cg_algorithm_name: streaming_product_slim
+    name: Streaming Product SLIM
+    layer: L1
+    gmv_7d: 23600  # $23.6K
+    sessions_7d: 370000  # 0.37M
+    ndcg: 0.651
+    ctr: 0.0184  # 1.84%
+    notes: Real-time SLIM updates
+    
+  - cg_algorithm_name: llm_search
+    name: LLM Search CG
+    layer: L1
+    gmv_7d: 279  # $279
+    sessions_7d: 40000  # 40K
+    ndcg: 0.633
+    ctr: 0.0067  # 0.67%
+    notes: LLM-generated search queries for candidates
+

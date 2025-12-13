@@ -222,3 +222,86 @@ metrics:
   - name: is_full_card_viewed
     description: Whether user saw all products in card
 
+# ============================================
+# Live Section IDs from BigQuery (Dec 2024)
+# ============================================
+# These are the section_id values tracked in the NDCG Visualizer dashboard
+# from intermediate__shop_personalization__recs_impressions_enriched
+
+tracked_section_ids:
+  - section_id: products_from_merchant_discovery_recs
+    name: Merchant Discovery Recs
+    description: Main unified recommendations module - ML-powered product discovery
+    gmv_7d: 1640000  # $1.64M
+    sessions_7d: 32570000  # 32.57M
+    ndcg: 0.548
+    ctr: 0.0056  # 0.56%
+    uses_unified_recs: true
+    unified_rec_pct: 78.6  # % of impressions from unified recs
+    notes: Primary optimization target - highest GMV contribution
+    
+  - section_id: minis_shoppable_video
+    name: Shoppable Video Minis
+    description: Short-form video product recommendations
+    gmv_7d: 0
+    sessions_7d: 40000  # 0.04M
+    ndcg: 0.631
+    ctr: 0.0000  # 0.00%
+    uses_unified_recs: true
+    unified_rec_pct: 100.0
+    notes: Emerging format - 100% unified recs, low volume
+    
+  - section_id: merchant_rec_with_deals
+    name: Merchant Recs with Deals
+    description: Deal-focused merchant recommendations
+    gmv_7d: 0
+    sessions_7d: 0
+    ndcg: 0.000
+    ctr: 0.0000
+    uses_unified_recs: true
+    unified_rec_pct: 87.0
+    notes: Very low volume - may be ramping up
+
+# Other section_ids in data (not currently tracked in dashboard)
+other_section_ids:
+  - section_id: recently_viewed
+    impressions_7d: 271000000  # 271M
+    sessions_7d: 46900000  # 46.9M
+    uses_unified_recs: false
+    notes: Rule-based, not ML recs
+    
+  - section_id: ads_merchant_rec
+    impressions_7d: 73000000  # 73M
+    uses_unified_recs: false
+    notes: Ads system
+    
+  - section_id: high_intent_product
+    impressions_7d: 16000000  # 16M
+    uses_unified_recs: false
+    notes: Cart/purchase intent signals
+    
+  - section_id: abandoned_cart
+    impressions_7d: 9500000  # 9.5M
+    uses_unified_recs: false
+    notes: Cart recovery
+    
+  - section_id: product_lists
+    impressions_7d: 2800000  # 2.8M
+    uses_unified_recs: false
+    
+  - section_id: saved_product_with_deals
+    impressions_7d: 2200000  # 2.2M
+    uses_unified_recs: false
+    
+  - section_id: abandoned_cart_with_deals
+    impressions_7d: 2200000  # 2.2M
+    uses_unified_recs: false
+    
+  - section_id: back_in_stock
+    impressions_7d: 885000  # 885K
+    uses_unified_recs: false
+    
+  - section_id: buy_again
+    impressions_7d: 756000  # 756K
+    uses_unified_recs: false
+
