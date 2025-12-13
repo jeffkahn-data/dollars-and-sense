@@ -1944,8 +1944,15 @@ HTML_TEMPLATE = '''
                     topOpps.style.display = 'block';
                 }
                 
+                // Sort by annual opportunity (0.7 target) descending
+                const sortedItems = [...data.items].sort((a, b) => {
+                    const aOpp = (a.gmv_opp_07 || 0) * annualFactor;
+                    const bOpp = (b.gmv_opp_07 || 0) * annualFactor;
+                    return bOpp - aOpp;
+                });
+                
                 // Populate table
-                data.items.forEach(item => {
+                sortedItems.forEach(item => {
                     const hasOpp06 = item.gmv_opp_06 > 0;
                     const hasOpp07 = item.gmv_opp_07 > 0;
                     const hasOpp08 = item.gmv_opp_08 > 0;
