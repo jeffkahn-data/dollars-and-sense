@@ -1080,6 +1080,8 @@ HTML_TEMPLATE = '''
                     <div class="dimension-selector">
                         <button class="dimension-btn" onclick="loadOptimization('surface')">Overall</button>
                         <button class="dimension-btn active" onclick="loadOptimization('module')">By Module</button>
+                        <button class="dimension-btn" onclick="loadOptimization('reranker')">By Reranker</button>
+                        <button class="dimension-btn" onclick="loadOptimization('cg_source')">By CG Source</button>
                         <button class="dimension-btn" onclick="loadOptimization('segment')">By Segment</button>
                         <button class="dimension-btn" onclick="loadOptimization('category')">By Category</button>
                     </div>
@@ -1154,6 +1156,8 @@ HTML_TEMPLATE = '''
                     <div class="dimension-selector">
                         <button class="dimension-btn" onclick="loadGmvOpportunity('surface')">Overall</button>
                         <button class="dimension-btn active" onclick="loadGmvOpportunity('module')">By Module</button>
+                        <button class="dimension-btn" onclick="loadGmvOpportunity('reranker')">By Reranker</button>
+                        <button class="dimension-btn" onclick="loadGmvOpportunity('cg_source')">By CG Source</button>
                         <button class="dimension-btn" onclick="loadGmvOpportunity('segment')">By Segment</button>
                         <button class="dimension-btn" onclick="loadGmvOpportunity('category')">By Category</button>
                         <button class="dimension-btn" onclick="loadGmvOpportunity('country')">By Country</button>
@@ -2319,7 +2323,7 @@ def api_metrics():
 @app.route('/api/optimization')
 def api_optimization():
     """Compute metrics broken down by dimension for optimization analysis."""
-    dimension = request.args.get('dimension', 'module')  # module, surface, segment, category
+    dimension = request.args.get('dimension', 'module')  # module, surface, segment, category, reranker, cg_source
     days_back = int(request.args.get('days_back', 7))
     
     client = get_bq_client()
@@ -2328,12 +2332,19 @@ def api_optimization():
     dim_column_map = {
         'surface': 'imp.surface',
         'module': 'imp.section_id',
+        'reranker': 'COALESCE(imp.algorithm_id, "unknown")',
+        'cg_source': 'cg.cg_algorithm_name',
         'segment': 'CASE WHEN imp.user_id > 0 THEN "returning" ELSE "anonymous" END',
         'category': 'COALESCE(p.category, "Uncategorized")'
     }
     
     dim_column = dim_column_map.get(dimension, 'imp.section_id')
     needs_product_join = dimension == 'category'
+    needs_cg_unnest = dimension == 'cg_source'
+    
+    # For CG source, we need to UNNEST the cg_sources array
+    cg_unnest = ", UNNEST(imp.cg_sources) AS cg" if needs_cg_unnest else ""
+    cg_filter = "AND cg.cg_algorithm_name IS NOT NULL" if needs_cg_unnest else ""
     
     query = f"""
     WITH impressions AS (
@@ -2349,12 +2360,14 @@ def api_optimization():
           ELSE 0
         END AS relevance
       FROM `sdp-prd-shop-ml.product_recommendation.intermediate__shop_personalization__recs_impressions_enriched` imp
-      {"LEFT JOIN `sdp-prd-merchandising.products_and_pricing_intermediate.products_extended` p ON CAST(imp.entity_id AS INT64) = p.product_id" if dimension == 'category' else ""}
+      {cg_unnest}
+      {"LEFT JOIN `sdp-prd-merchandising.products_and_pricing_intermediate.products_extended` p ON CAST(imp.entity_id AS INT64) = p.product_id" if needs_product_join else ""}
       WHERE DATE(imp.event_timestamp) >= DATE_SUB(CURRENT_DATE(), INTERVAL {days_back} DAY)
         AND imp.section_y_pos > 0
         AND imp.section_y_pos <= 20
         AND imp.entity_type = 'product'
         AND imp.section_id IN ('products_from_merchant_discovery_recs', 'minis_shoppable_video', 'merchant_rec_with_deals')
+        {cg_filter}
     ),
     
     -- Compute ideal ranks for IDCG
@@ -2517,6 +2530,8 @@ def api_gmv_opportunity():
     dim_column_map = {
         'surface': 'imp.surface',
         'module': 'imp.section_id',
+        'reranker': 'COALESCE(imp.algorithm_id, "unknown")',
+        'cg_source': 'cg.cg_algorithm_name',
         'segment': 'CASE WHEN imp.user_id > 0 THEN "Returning" ELSE "Anonymous" END',
         'category': 'COALESCE(p.category, "Uncategorized")',
         'country': 'COALESCE(ud.last.geo.country, "Unknown")'
@@ -2525,6 +2540,11 @@ def api_gmv_opportunity():
     dim_column = dim_column_map.get(dimension, 'imp.section_id')
     needs_product_join = dimension == 'category'
     needs_user_join = dimension == 'country'
+    needs_cg_unnest = dimension == 'cg_source'
+    
+    # For CG source, we need to UNNEST the cg_sources array (in addition to orders)
+    cg_unnest = ", UNNEST(imp.cg_sources) AS cg" if needs_cg_unnest else ""
+    cg_filter = "AND cg.cg_algorithm_name IS NOT NULL" if needs_cg_unnest else ""
     
     query = f"""
     WITH impressions AS (
@@ -2544,6 +2564,7 @@ def api_gmv_opportunity():
       FROM `sdp-prd-shop-ml.product_recommendation.intermediate__shop_personalization__recs_impressions_enriched` imp
       LEFT JOIN UNNEST(imp.any_touch_attr_orders) AS orders
         ON orders.is_attributable_to_product_click = TRUE
+      {cg_unnest}
       {"LEFT JOIN `sdp-prd-merchandising.products_and_pricing_intermediate.products_extended` p ON CAST(imp.entity_id AS INT64) = p.product_id" if needs_product_join else ""}
       {"LEFT JOIN `sdp-prd-shop-ml.mart.mart__shop_app__deduped_user_dimension` ud ON imp.user_id = ud.deduped_user_id" if needs_user_join else ""}
       WHERE DATE(imp.event_timestamp) >= DATE_SUB(CURRENT_DATE(), INTERVAL {days_back} DAY)
@@ -2551,6 +2572,7 @@ def api_gmv_opportunity():
         AND imp.section_y_pos <= 20
         AND imp.entity_type = 'product'
         AND imp.section_id IN ('products_from_merchant_discovery_recs', 'minis_shoppable_video', 'merchant_rec_with_deals')
+        {cg_filter}
     ),
     
     -- Get GMV for attributed orders
