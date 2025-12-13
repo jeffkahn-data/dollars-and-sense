@@ -1741,7 +1741,7 @@ HTML_TEMPLATE = '''
         }
         
         // Optimization functions
-        let currentDimension = 'surface';
+        let currentDimension = 'module';
         
         async function loadOptimization(dimension) {
             if (dimension) {
@@ -1855,7 +1855,7 @@ HTML_TEMPLATE = '''
         }
         
         // GMV Opportunity functions
-        let gmvDimension = 'surface';
+        let gmvDimension = 'module';
         
         function formatCurrency(amount) {
             if (amount >= 1000000000) {
@@ -2319,7 +2319,7 @@ def api_metrics():
 @app.route('/api/optimization')
 def api_optimization():
     """Compute metrics broken down by dimension for optimization analysis."""
-    dimension = request.args.get('dimension', 'surface')  # surface, segment, category
+    dimension = request.args.get('dimension', 'module')  # module, surface, segment, category
     days_back = int(request.args.get('days_back', 7))
     
     client = get_bq_client()
@@ -2508,7 +2508,7 @@ def api_gmv_opportunity():
     Research suggests ~10-30% GMV increase per 10% NDCG improvement in ranking systems.
     We use a conservative 15% GMV lift per 10% NDCG improvement.
     """
-    dimension = request.args.get('dimension', 'surface')
+    dimension = request.args.get('dimension', 'module')
     days_back = int(request.args.get('days_back', 7))
     
     client = get_bq_client()
