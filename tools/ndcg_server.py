@@ -1082,6 +1082,7 @@ HTML_TEMPLATE = '''
                         <button class="dimension-btn active" onclick="loadOptimization('module')">By Module</button>
                         <button class="dimension-btn" onclick="loadOptimization('reranker')">By Reranker</button>
                         <button class="dimension-btn" onclick="loadOptimization('cg_source')">By CG Source</button>
+                        <button class="dimension-btn" onclick="loadOptimization('position')">By Position</button>
                         <button class="dimension-btn" onclick="loadOptimization('category')">By Category</button>
                     </div>
                     <div class="filter-group">
@@ -1157,6 +1158,7 @@ HTML_TEMPLATE = '''
                         <button class="dimension-btn active" onclick="loadGmvOpportunity('module')">By Module</button>
                         <button class="dimension-btn" onclick="loadGmvOpportunity('reranker')">By Reranker</button>
                         <button class="dimension-btn" onclick="loadGmvOpportunity('cg_source')">By CG Source</button>
+                        <button class="dimension-btn" onclick="loadGmvOpportunity('position')">By Position</button>
                         <button class="dimension-btn" onclick="loadGmvOpportunity('category')">By Category</button>
                         <button class="dimension-btn" onclick="loadGmvOpportunity('country')">By Country</button>
                     </div>
@@ -2339,6 +2341,13 @@ def api_optimization():
         'module': 'imp.section_id',
         'reranker': 'COALESCE(imp.algorithm_id, "unknown")',
         'cg_source': 'cg.cg_algorithm_name',
+        'position': '''CASE 
+            WHEN imp.section_y_pos <= 3 THEN "1-3 (Top of Feed)"
+            WHEN imp.section_y_pos <= 6 THEN "4-6 (First Scroll)"
+            WHEN imp.section_y_pos <= 10 THEN "7-10 (Second Scroll)"
+            WHEN imp.section_y_pos <= 15 THEN "11-15 (Deep Scroll)"
+            ELSE "16-20 (Bottom)"
+        END''',
         'segment': 'CASE WHEN imp.user_id > 0 THEN "returning" ELSE "anonymous" END',
         'category': 'COALESCE(p.category, "Uncategorized")'
     }
@@ -2537,6 +2546,13 @@ def api_gmv_opportunity():
         'module': 'imp.section_id',
         'reranker': 'COALESCE(imp.algorithm_id, "unknown")',
         'cg_source': 'cg.cg_algorithm_name',
+        'position': '''CASE 
+            WHEN imp.section_y_pos <= 3 THEN "1-3 (Top of Feed)"
+            WHEN imp.section_y_pos <= 6 THEN "4-6 (First Scroll)"
+            WHEN imp.section_y_pos <= 10 THEN "7-10 (Second Scroll)"
+            WHEN imp.section_y_pos <= 15 THEN "11-15 (Deep Scroll)"
+            ELSE "16-20 (Bottom)"
+        END''',
         'segment': 'CASE WHEN imp.user_id > 0 THEN "Returning" ELSE "Anonymous" END',
         'category': 'COALESCE(p.category, "Uncategorized")',
         'country': 'COALESCE(ud.last.geo.country, "Unknown")'
